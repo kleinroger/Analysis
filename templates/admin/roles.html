@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">角色管理</div>
+  <div class="layui-card-body">
+    <form class="layui-form" method="post">
+      <div class="layui-form-item">
+        <div class="layui-inline"><input type="text" name="name" placeholder="角色名" class="layui-input"></div>
+        <div class="layui-inline"><input type="text" name="desc" placeholder="描述" class="layui-input"></div>
+        <div class="layui-inline"><button class="layui-btn" lay-submit>新增</button></div>
+      </div>
+    </form>
+    <table class="layui-table">
+      <thead><tr><th>ID</th><th>角色名</th><th>描述</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for r in roles %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.description or '' }}</td>
+          <td>
+            <form class="layui-form" method="post" action="{{ url_for('admin.update_role', role_id=r.id) }}">
+              <div class="layui-inline"><input type="text" name="name" value="{{ r.name }}" class="layui-input"></div>
+              <div class="layui-inline"><input type="text" name="desc" value="{{ r.description or '' }}" class="layui-input"></div>
+              <div class="layui-inline"><button class="layui-btn" lay-submit>保存</button></div>
+              <a class="layui-btn layui-btn-danger" href="{{ url_for('admin.delete_role', role_id=r.id) }}">删除</a>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

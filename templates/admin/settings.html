@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">系统设置</div>
+  <div class="layui-card-body">
+    <form class="layui-form" method="post">
+      <div class="layui-form-item">
+        <label class="layui-form-label">应用名称</label>
+        <div class="layui-input-block"><input type="text" name="app_name" value="{{ settings.app_name if settings else '' }}" class="layui-input" {% if session.get('role') != 'admin' %}disabled{% endif %}></div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">LOGO路径</label>
+        <div class="layui-input-block"><input type="text" name="logo_path" value="{{ settings.logo_path if settings else '' }}" class="layui-input" {% if session.get('role') != 'admin' %}disabled{% endif %}></div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          {% if session.get('role') == 'admin' %}
+            <button class="layui-btn" lay-submit>保存</button>
+          {% else %}
+            <button class="layui-btn layui-btn-disabled" disabled>仅管理员可保存</button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

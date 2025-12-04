@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">用户管理</div>
+  <div class="layui-card-body">
+    <form class="layui-form" method="post">
+      <div class="layui-form-item">
+        <div class="layui-inline"><input type="text" name="username" placeholder="用户名" class="layui-input"></div>
+        <div class="layui-inline"><input type="password" name="password" placeholder="密码" class="layui-input"></div>
+        <div class="layui-inline">
+          <select name="role_id">
+            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="layui-inline"><button class="layui-btn" lay-submit>新增</button></div>
+      </div>
+    </form>
+    <table class="layui-table">
+      <thead><tr><th>ID</th><th>用户名</th><th>角色</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.username }}</td>
+          <td>
+            <form class="layui-form" method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}">
+              <div class="layui-inline">
+                <select name="role_id">
+                  {% for r in roles %}<option value="{{ r.id }}" {% if r.name==u.role %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="layui-inline"><input type="password" name="password" placeholder="新密码(可选)" class="layui-input"></div>
+              <div class="layui-inline"><button class="layui-btn" lay-submit>保存</button></div>
+              <a class="layui-btn layui-btn-danger" href="{{ url_for('admin.delete_user', user_id=u.id) }}">删除</a>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

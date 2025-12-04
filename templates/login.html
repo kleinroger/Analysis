@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>用户登录</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+<style>
+body{background:#fff}
+.login-card{max-width:360px;margin:8vh auto;background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.login-header{padding:24px;background:linear-gradient(135deg,#4b7bf0,#5a62f2);color:#fff;border-radius:8px 8px 0 0;text-align:center}
+.login-body{padding:20px}
+.login-footer{padding:12px 20px 20px;color:#666;text-align:center}
+.error{color:#ff5722;text-align:center;margin-top:8px}
+.login-body .layui-form-item{position:relative}
+.login-body .layui-form-item .layui-input{padding-left:12px;margin-left:0;width:100%}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-header">
+    <div class="layui-icon layui-icon-username" style="font-size:32px"></div>
+    <div style="font-size:18px;margin-top:8px">用户登录</div>
+    <div style="font-size:12px;opacity:.9">欢迎回来，请登录您的账户</div>
+  </div>
+  <div class="login-body">
+    <form class="layui-form" method="post">
+      <div class="layui-form-item">
+        <input type="text" name="username" required lay-verify="required" placeholder="请输入用户名" autocomplete="off" class="layui-input">
+      </div>
+      <div class="layui-form-item">
+        <input type="password" name="password" required lay-verify="required" placeholder="请输入密码" autocomplete="off" class="layui-input">
+      </div>
+      <div class="layui-form-item">
+        <button class="layui-btn layui-btn-fluid" lay-submit>登录</button>
+      </div>
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    </form>
+  </div>
+  <div class="login-footer">还没有账号？立即注册</div>
+  <form class="layui-form" action="{{ url_for('auth.register') }}" method="post" style="display:none"></form>
+</div>
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+</body>
+</html>

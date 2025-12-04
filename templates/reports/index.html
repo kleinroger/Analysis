@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">
+    数据报表
+    <a href="{{ url_for('main.crawler') }}" class="layui-btn layui-btn-xs layui-btn-normal" style="float: right; margin-top: 5px;">数据采集模块</a>
+  </div>
+  <div class="layui-card-body">
+    {% if latest %}
+      <div class="layui-text">
+        <h3>{{ latest.title }}</h3>
+        <p style="color:#999">{{ latest.created_at }}</p>
+        <div>{{ latest.body }}</div>
+      </div>
+    {% else %}
+      暂无最新报告
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

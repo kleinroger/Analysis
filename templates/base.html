@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Public Opinion Analysis System</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+<div class="layui-header">
+<div class="layui-logo">{{ app_name }}</div>
+<ul class="layui-nav layui-layout-right">
+<li class="layui-nav-item"><a href="{{ url_for('auth.logout') }}">退出</a></li>
+</ul>
+</div>
+<div class="layui-side layui-bg-black">
+<div class="layui-side-scroll">
+<ul class="layui-nav layui-nav-tree">
+<li class="layui-nav-item"><a href="{{ url_for('main.index') }}">首页</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('main.reports') }}">数据报表</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('main.crawler') }}">数据采集</a></li>
+{% if session.get('role') == 'admin' %}
+<li class="layui-nav-item"><a href="{{ url_for('admin.index') }}">后台管理</a></li>
+{% endif %}
+<li class="layui-nav-item"><a href="{{ url_for('admin.settings') }}">系统设置</a></li>
+</ul>
+</div>
+</div>
+<div class="layui-body">
+<div class="layui-container">
+{% block content %}{% endblock %}
+</div>
+</div>
+<div class="layui-footer">© 2025</div>
+</div>
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script>
+layui.use(['element', 'jquery'], function(){
+  var element = layui.element;
+  var $ = layui.jquery;
+  
+  // Auto highlight current nav item
+  var path = window.location.pathname;
+  $('.layui-nav-item a').each(function(){
+    var href = $(this).attr('href');
+    if(path === href){
+      $(this).parent().addClass('layui-this');
+    }
+  });
+});
+</script>
+</body>
+</html>

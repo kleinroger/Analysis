@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-xs12 layui-col-sm6">
+    <div class="layui-card">
+      <div class="layui-card-header">快捷入口</div>
+      <div class="layui-card-body layui-btn-container">
+        <a class="layui-btn layui-btn-fluid" href="{{ url_for('admin.users') }}">用户管理</a>
+        <a class="layui-btn layui-btn-fluid" href="{{ url_for('admin.roles') }}">角色管理</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

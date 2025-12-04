@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">数据采集模块</div>
+  <div class="layui-card-body">
+    <div class="layui-form">
+      <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label">关键字</label>
+            <div class="layui-input-inline" style="width: 300px;">
+                <input type="text" id="keyword" placeholder="请输入舆情监控关键字" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-inline">
+            <button class="layui-btn layui-btn-normal" id="btn-crawl">
+                <i class="layui-icon layui-icon-search"></i> 开始采集
+            </button>
+        </div>
+      </div>
+    </div>
+    
+    <hr>
+
+    <div id="result-area">
+        <table class="layui-table" id="result-table" lay-filter="result-table">
+            <colgroup>
+                <col width="120">
+                <col>
+                <col>
+                <col width="150">
+                <col width="180">
+                <col width="100">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>封面</th>
+                    <th>标题</th>
+                    <th>摘要</th>
+                    <th>来源</th>
+                    <th>发布时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="result-tbody">
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999;">请输入关键字并点击采集按钮</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div id="loading" style="display: none; text-align: center; padding: 50px;">
+        <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 40px; color: #1E9FFF;"></i>
+        <p style="margin-top: 10px; color: #666;">正在全网采集数据，请稍候...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+layui.use(['layer', 'jquery', 'form'], function(){
+  var layer = layui.layer;
+  var $ = layui.jquery;
+  
+  // Allow pressing Enter to search
+  $('#keyword').on('keypress', function(e){
+      if(e.which === 13){
+          $('#btn-crawl').click();
+      }
+  });
+  
+  $('#btn-crawl').click(function(){
+    var keyword = $('#keyword').val();
+    if(!keyword){
+        layer.msg('请输入关键字', {icon: 0});
+        return;
+    }
+    
+    $('#result-table').hide();
+    $('#loading').show();
+    
+    $.ajax({
+        url: "{{ url_for('main.api_crawl') }}",
+        data: {keyword: keyword},
+        timeout: 30000, // 30 seconds timeout
+        success: function(res){
+            $('#loading').hide();
+            $('#result-table').show();
+            
+            if(res.data && res.data.length > 0){
+                var html = '';
+                res.data.forEach(function(item){
+                    var img = item.cover ? '<img src="'+item.cover+'" style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px;" onclick="window.open(this.src)">' : '<span style="color:#ccc">无图</span>';
+                    
+                    html += '<tr>';
+                    html += '<td>'+img+'</td>';
+                    html += '<td><a href="'+item.original_url+'" target="_blank" style="color: #1E9FFF; font-weight: bold;">'+item.title+'</a></td>';
+                    html += '<td style="font-size: 12px; color: #666;">'+(item.summary || '暂无摘要')+'</td>';
+                    html += '<td>'+(item.source || '未知来源')+'</td>';
+                    html += '<td style="color: #999;">'+(item.date || '未知时间')+'</td>';
+                    html += '<td><a href="'+item.original_url+'" target="_blank" class="layui-btn layui-btn-xs layui-btn-primary">查看原文</a></td>';
+                    html += '</tr>';
+                });
+                $('#result-tbody').html(html);
+                layer.msg('采集完成，共找到 ' + res.count + ' 条相关舆情', {icon: 1});
+            } else {
+                $('#result-tbody').html('<tr><td colspan="6" style="text-align: center; padding: 30px;">未找到关于 "'+keyword+'" 的相关数据</td></tr>');
+                layer.msg('未采集到数据', {icon: 0});
+            }
+        },
+        error: function(xhr, status, error){
+            $('#loading').hide();
+            $('#result-table').show();
+            var errorMsg = '采集失败';
+            
+            if(xhr.status === 302 || xhr.status === 401 || xhr.responseJSON && xhr.responseJSON.error === 'Unauthorized'){
+                window.location.href = "{{ url_for('auth.login') }}";
+                return;
+            }
+            
+            if(xhr.responseJSON && xhr.responseJSON.error){
+                errorMsg += ': ' + xhr.responseJSON.error;
+            } else if(status === 'timeout'){
+                errorMsg = '请求超时，请稍后重试';
+            } else {
+                errorMsg += ': ' + error;
+            }
+            layer.msg(errorMsg, {icon: 2});
+            $('#result-tbody').html('<tr><td colspan="6" style="text-align: center; color: red;">'+errorMsg+'</td></tr>');
+        }
+    });
+  });
+});
+</script>
+{% endblock %}
