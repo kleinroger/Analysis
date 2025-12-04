@@ -45,19 +45,21 @@ def logout():
     session.clear()
     return redirect(url_for('auth.login'))
 
-@bp.route('/register', methods=['POST'])
+@bp.route('/register', methods=['GET', 'POST'])
 def register():
+    if request.method == 'GET':
+        return render_template('register.html')
     username = request.form.get('username','').strip()
     password = request.form.get('password','')
     role_name = request.form.get('role','user')
     if not username or not password:
-        return redirect(url_for('auth.login'))
+        return render_template('register.html', error='请输入用户名和密码')
     db = get_db()
+    exists = db.execute('SELECT 1 FROM users WHERE username=?', (username,)).fetchone()
+    if exists:
+        return render_template('register.html', error='用户名已存在')
     role = db.execute('SELECT id FROM roles WHERE name = ?', (role_name,)).fetchone()
     role_id = role['id'] if role else None
-    try:
-        db.execute('INSERT INTO users(username, password_hash, role_id) VALUES(?,?,?)', (username, generate_password_hash(password), role_id))
-        db.commit()
-    except Exception:
-        pass
+    db.execute('INSERT INTO users(username, password_hash, role_id) VALUES(?,?,?)', (username, generate_password_hash(password), role_id))
+    db.commit()
     return redirect(url_for('auth.login'))

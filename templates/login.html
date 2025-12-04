@@ -37,8 +37,7 @@ body{background:#fff}
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
     </form>
   </div>
-  <div class="login-footer">还没有账号？立即注册</div>
-  <form class="layui-form" action="{{ url_for('auth.register') }}" method="post" style="display:none"></form>
+  <div class="login-footer"><a href="{{ url_for('auth.register') }}">还没有账号？立即注册</a></div>
 </div>
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
 </body>

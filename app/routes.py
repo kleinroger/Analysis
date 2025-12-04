@@ -15,21 +15,3 @@ def reports():
     db = get_db()
     latest = db.execute('SELECT title, body, created_at FROM reports ORDER BY id DESC LIMIT 1').fetchone()
     return render_template('reports/index.html', latest=latest)
-
-@bp.route('/crawler')
-@login_required
-def crawler():
-    return render_template('crawler/index.html')
-
-@bp.route('/api/crawl')
-@login_required
-def api_crawl():
-    keyword = request.args.get('keyword')
-    if not keyword:
-        return jsonify({'error': 'Keyword is required'}), 400
-    
-    try:
-        data = crawl_baidu_news(keyword)
-        return jsonify({'data': data, 'count': len(data)})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500

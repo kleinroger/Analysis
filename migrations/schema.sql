@@ -22,3 +22,27 @@ CREATE TABLE IF NOT EXISTS reports (
   body TEXT,
   created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS crawl_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT,
+  title TEXT,
+  summary TEXT,
+  cover TEXT,
+  original_url TEXT,
+  source TEXT,
+  created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crawl_records_url ON crawl_records(original_url);
+CREATE TABLE IF NOT EXISTS crawl_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT,
+  title TEXT,
+  summary TEXT,
+  cover TEXT,
+  original_url TEXT,
+  source TEXT,
+  deep_crawled INTEGER DEFAULT 0,
+  deep_content TEXT,
+  created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crawl_items_url ON crawl_items(original_url);

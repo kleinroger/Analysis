@@ -105,3 +105,88 @@ def settings():
         return redirect(url_for('admin.settings'))
     row = get_db().execute('SELECT app_name, logo_path FROM settings LIMIT 1').fetchone()
     return render_template('admin/settings.html', settings=row)
+
+@bp.route('/crawls')
+@login_required
+def crawls():
+    return render_template('admin/crawls.html')
+
+@bp.route('/api/crawl_page')
+@login_required
+def api_crawl_page():
+    from .crawler import crawl_baidu_news
+    from flask import jsonify, request
+    kw = request.args.get('keyword','').strip()
+    pn = request.args.get('pn','0').strip()
+    try:
+        pn_val = int(pn)
+    except Exception:
+        pn_val = 0
+    if not kw:
+        return jsonify({'error':'Keyword required'}), 400
+    data = crawl_baidu_news(kw, pn=pn_val)
+    return jsonify({'data': data, 'pn': pn_val})
+
+@bp.route('/api/deep_crawl', methods=['POST'])
+@login_required
+def api_deep_crawl():
+    import requests
+    from bs4 import BeautifulSoup
+    from flask import jsonify, request
+    url = request.json.get('url','') if request.is_json else request.form.get('url','')
+    if not url:
+        return jsonify({'error':'url required'}), 400
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        # naive extraction
+        main = soup.find('article') or soup.find('div', class_='content') or soup.find('div', id='content') or soup.body
+        text = main.get_text('\n', strip=True) if main else ''
+        return jsonify({'content': text[:10000]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/save_items', methods=['POST'])
+@login_required
+def api_save_items():
+    from flask import request, jsonify
+    from .db import get_db
+    import datetime
+    items = []
+    if request.is_json:
+        items = request.json.get('items', [])
+    else:
+        # support form
+        items = request.form.get('items') or '[]'
+        import json
+        items = json.loads(items)
+    if not isinstance(items, list):
+        return jsonify({'error':'items must be list'}), 400
+    db = get_db()
+    now = datetime.datetime.now().isoformat()
+    saved = 0
+    for it in items:
+        url = (it.get('original_url') or '').strip()
+        if not url:
+            continue
+        exists = db.execute('SELECT 1 FROM crawl_items WHERE original_url=?', (url,)).fetchone()
+        if exists:
+            continue
+        db.execute(
+            'INSERT INTO crawl_items(keyword,title,summary,cover,original_url,source,deep_crawled,deep_content,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            (
+                it.get('keyword',''),
+                it.get('title',''),
+                it.get('summary',''),
+                it.get('cover',''),
+                url,
+                it.get('source',''),
+                1 if it.get('deep_crawled') else 0,
+                it.get('deep_content',''),
+                now
+            )
+        )
+        saved += 1
+    db.commit()
+    return jsonify({'saved': saved})

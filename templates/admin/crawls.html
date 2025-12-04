@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">数据采集管理</div>
+  <div class="layui-card-body">
+    <div class="layui-form">
+      <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">关键字</label>
+          <div class="layui-input-inline" style="width: 300px;">
+            <input type="text" id="kw" placeholder="请输入采集关键字" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-inline">
+          <label class="layui-form-label">数量</label>
+          <div class="layui-input-inline" style="width: 120px;">
+            <input type="number" id="num" min="1" max="100" value="10" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-inline">
+          <button class="layui-btn" id="btn-start"><i class="layui-icon layui-icon-search"></i> 开始采集</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin:10px 0">
+      <div style="height:12px;background:#f2f2f2;border-radius:6px;overflow:hidden">
+        <div id="progress" style="height:12px;width:0;background:#1E9FFF"></div>
+      </div>
+      <div id="progress-text" style="font-size:12px;color:#666;margin-top:6px">进度：0%</div>
+    </div>
+
+    <div style="margin:10px 0">
+      <button class="layui-btn layui-btn-normal" id="btn-save-selected">保存选中</button>
+    </div>
+
+    <div id="grid" class="layui-row layui-col-space15"></div>
+  </div>
+</div>
+{% endblock %}
+{% block page_script %}
+<script>
+layui.use(['jquery','layer'], function(){
+  var $ = layui.jquery; var layer = layui.layer;
+  var aggregated = []; var selected = new Set();
+  function renderCards(){
+    var html = '';
+    aggregated.forEach(function(item, idx){
+      html += '<div class="layui-col-xs12 layui-col-sm6 layui-col-md4">\n';
+      html += ' <div class="layui-card">\n';
+      html += '  <div class="layui-card-body">\n';
+      var cover = item.cover ? ('<a href="'+item.original_url+'" target="_blank"><img src="'+item.cover+'" style="width:100%;height:140px;object-fit:cover;border-radius:4px" referrerpolicy="no-referrer"></a>') : '<div style="height:140px;background:#f5f5f5;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#bbb">无图</div>';
+      html += cover;
+      html += '   <div style="margin-top:8px;font-weight:bold"><a href="'+(item.original_url||'#')+'" target="_blank" style="color:#1E9FFF">'+(item.title||'')+'</a></div>\n';
+      html += '   <div style="color:#666;font-size:12px;">来源：'+(item.source||'未知')+'</div>\n';
+      html += '   <div style="margin-top:8px;display:flex;gap:8px;align-items:center">\n';
+      html += '     <input type="checkbox" data-idx="'+idx+'" '+(selected.has(idx)?'checked':'')+'> 选中\n';
+      html += '     <button class="layui-btn layui-btn-xs" data-action="deep" data-idx="'+idx+'">深度采集</button>\n';
+      html += '     <span style="font-size:12px;color:'+(item.deep_crawled?'#16b777':'#ff5722')+'">'+(item.deep_crawled?'已深度采集':'未深度采集')+'</span>\n';
+      html += '   </div>\n';
+      html += '  </div>\n';
+      html += ' </div>\n';
+      html += '</div>\n';
+    });
+    $('#grid').html(html);
+  }
+  function updateProgress(done, total){
+    var pct = total>0 ? Math.round(done*100/total) : 0;
+    $('#progress').css('width', pct+'%');
+    $('#progress-text').text('进度：'+pct+'%（'+done+'/'+total+'）');
+  }
+  $('#grid').on('change','input[type=checkbox]', function(){
+    var idx = parseInt($(this).attr('data-idx'),10);
+    if($(this).is(':checked')) selected.add(idx); else selected.delete(idx);
+  });
+  $('#grid').on('click','button[data-action=deep]', function(){
+    var idx = parseInt($(this).attr('data-idx'),10);
+    var it = aggregated[idx];
+    if(!it || !it.original_url){ layer.msg('无有效链接',{icon:0}); return; }
+    layer.msg('深度采集中...', {icon: 16, time: 1000});
+    $.ajax({
+      url: '{{ url_for('admin.api_deep_crawl') }}',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({url: it.original_url}),
+      success: function(res){
+        it.deep_crawled = true;
+        it.deep_content = res.content || '';
+        renderCards();
+        layer.msg('深度采集完成',{icon:1});
+      },
+      error: function(){ layer.msg('深度采集失败',{icon:2}); }
+    });
+  });
+  $('#btn-save-selected').on('click', function(){
+    var items = [];
+    selected.forEach(function(idx){ var it = aggregated[idx]; if(it){ items.push(it);} });
+    if(items.length===0){ layer.msg('请先选择数据',{icon:0}); return; }
+    $.ajax({
+      url: '{{ url_for('admin.api_save_items') }}',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({items: items}),
+      success: function(res){ layer.msg('已保存 '+(res.saved||0)+' 条',{icon:1}); },
+      error: function(){ layer.msg('保存失败',{icon:2}); }
+    });
+  });
+  $('#btn-start').on('click', function(){
+    var kw = $('#kw').val().trim(); var num = parseInt($('#num').val(),10);
+    if(!kw){ layer.msg('请输入关键字',{icon:0}); return; }
+    if(isNaN(num)|| num<1 || num>100){ layer.msg('数量范围1-100',{icon:0}); return; }
+    aggregated = []; selected.clear(); renderCards();
+    var pages = Math.ceil(num/10); var done = 0;
+    function fetchPage(pn){
+      $.ajax({
+        url: '{{ url_for('admin.api_crawl_page') }}',
+        data: {keyword: kw, pn: pn},
+        success: function(res){
+          var list = res.data || [];
+          list.forEach(function(it){
+            if(!aggregated.find(function(e){ return e.original_url===it.original_url; })){
+              it.keyword = kw; it.deep_crawled = false; it.deep_content = '';
+              aggregated.push(it);
+            }
+          });
+          done++;
+          updateProgress(done, pages);
+          renderCards();
+          if(done < pages && aggregated.length < num){ fetchPage(done*10); }
+          else {
+            aggregated = aggregated.slice(0, num);
+            renderCards();
+            layer.msg('采集完成，共 '+aggregated.length+' 条',{icon:1});
+          }
+        },
+        error: function(){ done++; updateProgress(done, pages); if(done < pages){ fetchPage(done*10);} }
+      });
+    }
+    updateProgress(0, pages);
+    fetchPage(0);
+  });
+});
+</script>
+{% endblock %}

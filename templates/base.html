@@ -18,10 +18,10 @@
 <ul class="layui-nav layui-nav-tree">
 <li class="layui-nav-item"><a href="{{ url_for('main.index') }}">首页</a></li>
 <li class="layui-nav-item"><a href="{{ url_for('main.reports') }}">数据报表</a></li>
-<li class="layui-nav-item"><a href="{{ url_for('main.crawler') }}">数据采集</a></li>
 {% if session.get('role') == 'admin' %}
 <li class="layui-nav-item"><a href="{{ url_for('admin.index') }}">后台管理</a></li>
 {% endif %}
+<li class="layui-nav-item"><a href="{{ url_for('admin.crawls') }}">数据采集管理</a></li>
 <li class="layui-nav-item"><a href="{{ url_for('admin.settings') }}">系统设置</a></li>
 </ul>
 </div>
@@ -49,5 +49,6 @@ layui.use(['element', 'jquery'], function(){
   });
 });
 </script>
+{% block page_script %}{% endblock %}
 </body>
 </html>
