@@ -56,3 +56,22 @@ def init_app(app):
         db.commit()
         import click as _click
         _click.echo('app_name set')
+
+    @app.cli.command('migrate-db')
+    def migrate_db_command():
+        init_db()
+        db = get_db()
+        def has_column(table, name):
+            rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+            for r in rows:
+                if r['name'] == name:
+                    return True
+            return False
+        if not has_column('crawl_items', 'deep_crawled'):
+            db.execute("ALTER TABLE crawl_items ADD COLUMN deep_crawled INTEGER DEFAULT 0")
+        if not has_column('crawl_items', 'deep_content'):
+            db.execute("ALTER TABLE crawl_items ADD COLUMN deep_content TEXT")
+        if not has_column('crawl_items', 'detail_json'):
+            db.execute("ALTER TABLE crawl_items ADD COLUMN detail_json TEXT")
+        db.commit()
+        click.echo('migrated')

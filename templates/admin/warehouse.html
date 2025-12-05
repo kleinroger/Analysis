@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">数据仓库管理</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">搜索</label>
+          <div class="layui-input-inline" style="width:300px">
+            <input type="text" id="q" placeholder="按标题或关键字搜索" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-inline">
+          <button class="layui-btn" id="btn-search"><i class="layui-icon layui-icon-search"></i> 查询</button>
+          <button class="layui-btn layui-btn-primary" id="btn-refresh"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+        </div>
+      </div>
+    </div>
+
+    <table class="layui-table" id="warehouse-table" style="table-layout:fixed">
+      <thead>
+        <tr>
+          <th class="th-title">标题</th>
+          <th class="th-summary">概要</th>
+          <th class="th-keyword">关键字</th>
+          <th class="th-source">来源</th>
+          <th class="th-url">URL</th>
+          <th class="th-created">创建时间</th>
+          <th class="th-ops">操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="pager" style="text-align:center;margin-top:10px"></div>
+  </div>
+{% endblock %}
+{% block page_script %}
+<script>
+layui.use(['jquery','layer','laypage','form'], function(){
+  var $ = layui.jquery; var layer = layui.layer; var laypage = layui.laypage; var form = layui.form;
+  var cache = []; var total = 0; var page = 1; var limit = 10; var q = '';
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var style = document.createElement('style');
+  style.textContent = [
+    '#warehouse-table th.th-title{width:40%}',
+    '#warehouse-table th.th-summary{width:34%}',
+    '#warehouse-table th.th-keyword{width:120px}',
+    '#warehouse-table th.th-source{width:100px}',
+    '#warehouse-table th.th-url{width:18%}',
+    '#warehouse-table th.th-created{width:140px}',
+    '#warehouse-table th.th-ops{width:220px}',
+    '#warehouse-table td.cell-url a{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '#warehouse-table td.cell-title,#warehouse-table td.cell-summary{word-break:break-word}',
+    '.source-badge{display:inline-block;padding:0 8px;line-height:20px;border-radius:10px;font-size:12px;color:#fff}',
+    '.source-baidu{background:#1E9FFF}',
+    '.source-xinhua{background:#16b777}',
+    '.summary-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+    '#pager{position:relative;z-index:10;padding:10px 0;background:#fff}',
+    '.layui-laypage{z-index:10}'
+  ].join('\n');
+  document.head.appendChild(style);
+  function sourceText(v){ var m={baidu:'百度新闻', xinhua:'新华网'}; return m[v]||'未知'; }
+  function render(){
+    var html = '';
+    cache.forEach(function(it){
+      html += '<tr>'+
+              '<td class="cell-title"><a href="'+(it.original_url||'#')+'" target="_blank" style="color:#1E9FFF">'+esc(it.title||'')+'</a></td>'+
+              '<td class="cell-summary"><div class="summary-clamp">'+(esc(it.summary||''))+'</div></td>'+
+              '<td class="cell-keyword">'+esc(it.keyword||'')+'</td>'+
+              '<td class="cell-source"><span class="source-badge '+('source-'+(esc(it.source||'')||'')).replace('新华网','xinhua').replace('百度新闻','baidu')+'">'+sourceText(it.source||'')+'</span></td>'+
+              '<td class="cell-url"><a href="'+(it.original_url||'#')+'" target="_blank" style="color:#1E9FFF">'+esc(it.original_url||'')+'</a></td>'+
+              '<td class="cell-created">'+(esc(it.created_at||''))+'</td>'+
+              '<td>'+
+                '<button class="layui-btn layui-btn-xs" data-action="open" data-id="'+it.id+'">打开原网页</button> '+
+                '<button class="layui-btn layui-btn-warm layui-btn-xs" data-action="edit" data-id="'+it.id+'">编辑</button> '+
+                '<button class="layui-btn layui-btn-normal layui-btn-xs" data-action="ai" data-id="'+it.id+'">AI解析</button> '+
+                '<button class="layui-btn layui-btn-danger layui-btn-xs" data-action="del" data-id="'+it.id+'">删除</button>'+
+              '</td>'+
+              '</tr>';
+    });
+    $('#tbody').html(html);
+  }
+  function renderPager(){
+    laypage.render({
+      elem: 'pager',
+      count: total,
+      limit: limit,
+      curr: page,
+      layout: ['prev','page','next','count'],
+      jump: function(obj, first){
+        page = obj.curr; limit = obj.limit;
+        if(!first){ fetch(); }
+      }
+    });
+  }
+  function fetch(){
+    $.get("{{ url_for('admin.api_warehouse_items') }}", {page: page, limit: limit, q: q}).done(function(res){
+      cache = res.items || []; total = res.total || 0; render(); renderPager();
+    }).fail(function(){ layer.msg('加载失败',{icon:2}); });
+  }
+  $('#btn-search').on('click', function(){ q = $('#q').val().trim(); page = 1; fetch(); });
+  $('#btn-refresh').on('click', function(){ fetch(); });
+  $('#tbody').on('click','button[data-action=open]', function(){
+    var id = $(this).attr('data-id');
+    var it = cache.find(function(x){ return String(x.id)===String(id); });
+    if(!it || !it.original_url){ layer.msg('无有效链接',{icon:0}); return; }
+    window.open(it.original_url, '_blank');
+  });
+  $('#tbody').on('click','button[data-action=edit]', function(){
+    var id = $(this).attr('data-id')||'';
+    var it = cache.find(function(x){ return String(x.id)===String(id); }) || {};
+    var formHtml = '<div style="padding:12px">'+
+      '<div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input id="edit-title" class="layui-input" value="'+(esc(it.title||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">概要</label><div class="layui-input-block"><textarea id="edit-summary" class="layui-textarea">'+(esc(it.summary||''))+'</textarea></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">来源</label><div class="layui-input-block"><input id="edit-source" class="layui-input" value="'+(esc(it.source||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">URL</label><div class="layui-input-block"><input id="edit-url" class="layui-input" value="'+(esc(it.original_url||''))+'"></div></div>'+
+      '</div>';
+    layer.open({
+      title: '编辑',
+      area: ['720px','540px'],
+      content: formHtml,
+      btn: ['保存','取消'],
+      yes: function(index){
+        var payload = {
+          title: $('#edit-title').val(),
+          summary: $('#edit-summary').val(),
+          source: $('#edit-source').val(),
+          original_url: $('#edit-url').val()
+        };
+        $.ajax({
+          url: "{{ url_for('admin.api_warehouse_update', item_id=0) }}".replace('0', id),
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(payload)
+        }).done(function(){ layer.msg('已保存',{icon:1}); layer.close(index); fetch(); })
+          .fail(function(){ layer.msg('保存失败',{icon:2}); });
+      }
+    });
+  });
+  $('#tbody').on('click','button[data-action=ai]', function(){
+    var id = $(this).attr('data-id');
+    $.ajax({
+      url: "{{ url_for('admin.api_warehouse_analyze', item_id=0) }}".replace('0', id),
+      method: 'POST'
+    }).done(function(res){
+      var preview = esc(res.preview||'');
+      layer.open({ title: 'AI解析预览', area: ['720px','540px'], content: '<div style="padding:12px;white-space:pre-wrap;line-height:1.6;max-height:440px;overflow:auto">'+preview+'</div>' });
+    }).fail(function(){ layer.msg('解析失败',{icon:2}); });
+  });
+  $('#tbody').on('click','button[data-action=del]', function(){
+    var id = $(this).attr('data-id');
+    layer.confirm('确认删除该条数据？', function(idx){
+      $.post("{{ url_for('admin.api_warehouse_delete', item_id=0) }}".replace('0', id), {}).done(function(){ layer.msg('已删除',{icon:1}); fetch(); })
+        .fail(function(){ layer.msg('删除失败',{icon:2}); });
+      layer.close(idx);
+    });
+  });
+  fetch();
+});
+</script>
+{% endblock %}

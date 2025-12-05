@@ -114,18 +114,25 @@ def crawls():
 @bp.route('/api/crawl_page')
 @login_required
 def api_crawl_page():
-    from .crawler import crawl_baidu_news
+    from .crawler import crawl_baidu_news, crawl_xinhua_news
     from flask import jsonify, request
     kw = request.args.get('keyword','').strip()
     pn = request.args.get('pn','0').strip()
+    source = (request.args.get('source','baidu') or 'baidu').strip()
     try:
         pn_val = int(pn)
     except Exception:
         pn_val = 0
     if not kw:
         return jsonify({'error':'Keyword required'}), 400
-    data = crawl_baidu_news(kw, pn=pn_val)
-    return jsonify({'data': data, 'pn': pn_val})
+    if source == 'baidu':
+        data = crawl_baidu_news(kw, pn=pn_val)
+    elif source == 'xinhua':
+        page = max(1, int(pn_val/10)+1)
+        data = crawl_xinhua_news(kw, page=page)
+    else:
+        return jsonify({'error':'Unknown source'}), 400
+    return jsonify({'data': data, 'pn': pn_val, 'source': source})
 
 @bp.route('/api/deep_crawl', methods=['POST'])
 @login_required
@@ -174,7 +181,7 @@ def api_save_items():
         if exists:
             continue
         db.execute(
-            'INSERT INTO crawl_items(keyword,title,summary,cover,original_url,source,deep_crawled,deep_content,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO crawl_items(keyword,title,summary,cover,original_url,source,deep_crawled,deep_content,detail_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
             (
                 it.get('keyword',''),
                 it.get('title',''),
@@ -184,9 +191,192 @@ def api_save_items():
                 it.get('source',''),
                 1 if it.get('deep_crawled') else 0,
                 it.get('deep_content',''),
+                it.get('detail_json','') or '{}',
                 now
             )
         )
         saved += 1
     db.commit()
     return jsonify({'saved': saved})
+
+@bp.route('/api/crawl_auto', methods=['POST'])
+@login_required
+def api_crawl_auto():
+    from flask import request, jsonify
+    from .crawler import crawl_baidu_news, crawl_xinhua_news
+    from .db import get_db
+    import datetime, json, requests
+    from bs4 import BeautifulSoup
+    kw = ''
+    num = 10
+    source = 'baidu'
+    if request.is_json:
+        kw = (request.json.get('keyword','') or '').strip()
+        try:
+            num = int(request.json.get('num','10'))
+        except Exception:
+            num = 10
+        src = (request.json.get('source','baidu') or 'baidu').strip()
+        source = src
+    else:
+        kw = (request.form.get('keyword','') or '').strip()
+        try:
+            num = int(request.form.get('num','10'))
+        except Exception:
+            num = 10
+        src = (request.form.get('source','baidu') or 'baidu').strip()
+        source = src
+    if not kw:
+        return jsonify({'error':'Keyword required'}), 400
+    if num < 1:
+        num = 1
+    if num > 100:
+        num = 100
+    db = get_db()
+    aggregated = []
+    seen = set()
+    # Iterate pages depending on source
+    if source == 'baidu':
+        cursor = 0
+        step = 10
+        def fetch():
+            return crawl_baidu_news(kw, pn=cursor)
+        def advance():
+            nonlocal cursor
+            cursor += step
+        limit = 200
+    elif source == 'xinhua':
+        cursor = 1
+        step = 1
+        def fetch():
+            return crawl_xinhua_news(kw, page=cursor)
+        def advance():
+            nonlocal cursor
+            cursor += step
+        limit = 50
+    else:
+        return jsonify({'error':'Unknown source'}), 400
+    while len(aggregated) < num and cursor <= limit:
+        page = fetch()
+        if not page:
+            break
+        for it in page:
+            url = (it.get('original_url') or '').strip()
+            if not url or url in seen or not it.get('cover') or not it.get('title'):
+                continue
+            seen.add(url)
+            it['keyword'] = kw
+            aggregated.append(it)
+            if len(aggregated) >= num:
+                break
+        advance()
+    now = datetime.datetime.now().isoformat()
+    saved = 0
+    for it in aggregated:
+        url = (it.get('original_url') or '').strip()
+        if not url or not it.get('cover') or not it.get('title'):
+            continue
+        exists = db.execute('SELECT 1 FROM crawl_items WHERE original_url=?', (url,)).fetchone()
+        if exists:
+            continue
+        content = ''
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            main = soup.find('article') or soup.find('div', class_='content') or soup.find('div', id='content') or soup.body
+            content = main.get_text('\n', strip=True)[:10000] if main else ''
+        except Exception:
+            content = ''
+        details = {'content_length': len(content)}
+        db.execute(
+            'INSERT INTO crawl_items(keyword,title,summary,cover,original_url,source,deep_crawled,deep_content,detail_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            (
+                it.get('keyword',''),
+                it.get('title',''),
+                it.get('summary',''),
+                it.get('cover',''),
+                url,
+                it.get('source',''),
+                1 if content else 0,
+                content,
+                json.dumps(details, ensure_ascii=False),
+                now
+            )
+        )
+        saved += 1
+    db.commit()
+    return jsonify({'saved': saved, 'requested': num, 'keyword': kw, 'items': len(aggregated), 'source': source})
+
+@bp.route('/warehouse')
+@login_required
+def warehouse():
+    return render_template('admin/warehouse.html')
+
+@bp.route('/api/warehouse_items')
+@login_required
+def api_warehouse_items():
+    from flask import jsonify, request
+    db = get_db()
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '10'))
+    except Exception:
+        page, limit = 1, 10
+    q = (request.args.get('q','') or '').strip()
+    if limit < 1:
+        limit = 10
+    if limit > 100:
+        limit = 100
+    offset = (page - 1) * limit
+    if q:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM crawl_items WHERE title LIKE ? OR keyword LIKE ?', (f'%{q}%', f'%{q}%')).fetchone()['cnt']
+        rows = db.execute('SELECT id,keyword,title,summary,cover,original_url,source,deep_crawled,created_at FROM crawl_items WHERE title LIKE ? OR keyword LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', (f'%{q}%', f'%{q}%', limit, offset)).fetchall()
+    else:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM crawl_items').fetchone()['cnt']
+        rows = db.execute('SELECT id,keyword,title,summary,cover,original_url,source,deep_crawled,created_at FROM crawl_items ORDER BY created_at DESC LIMIT ? OFFSET ?', (limit, offset)).fetchall()
+    items = []
+    for r in rows:
+        items.append({
+            'id': r['id'],
+            'keyword': r['keyword'],
+            'title': r['title'],
+            'summary': r['summary'],
+            'cover': r['cover'],
+            'original_url': r['original_url'],
+            'source': r['source'],
+            'deep_crawled': bool(r['deep_crawled']),
+            'created_at': r['created_at']
+        })
+    return jsonify({'items': items, 'total': total, 'page': page, 'limit': limit})
+
+@bp.route('/api/warehouse_item/<int:item_id>')
+@login_required
+def api_warehouse_item(item_id):
+    from flask import jsonify
+    db = get_db()
+    r = db.execute('SELECT id,keyword,title,summary,cover,original_url,source,deep_crawled,deep_content,detail_json,created_at FROM crawl_items WHERE id=?', (item_id,)).fetchone()
+    if not r:
+        return jsonify({'error':'not found'}), 404
+    return jsonify({
+        'id': r['id'],
+        'keyword': r['keyword'],
+        'title': r['title'],
+        'summary': r['summary'],
+        'cover': r['cover'],
+        'original_url': r['original_url'],
+        'source': r['source'],
+        'deep_crawled': bool(r['deep_crawled']),
+        'deep_content': r['deep_content'] or '',
+        'detail_json': r['detail_json'] or '{}',
+        'created_at': r['created_at']
+    })
+
+@bp.route('/api/warehouse_delete/<int:item_id>', methods=['POST'])
+@login_required
+def api_warehouse_delete(item_id):
+    from flask import jsonify
+    db = get_db()
+    db.execute('DELETE FROM crawl_items WHERE id=?', (item_id,))
+    db.commit()
+    return jsonify({'deleted': 1})

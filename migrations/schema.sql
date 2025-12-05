@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS crawl_items (
   source TEXT,
   deep_crawled INTEGER DEFAULT 0,
   deep_content TEXT,
+  detail_json TEXT,
   created_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_crawl_items_url ON crawl_items(original_url);
