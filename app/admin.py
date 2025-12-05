@@ -114,7 +114,7 @@ def crawls():
 @bp.route('/api/crawl_page')
 @login_required
 def api_crawl_page():
-    from .crawler import crawl_baidu_news, crawl_xinhua_news
+    from .crawler import crawl_baidu_news, crawl_sina_news, crawl_sohu_news, crawl_xinhua_multi
     from flask import jsonify, request
     kw = request.args.get('keyword','').strip()
     pn = request.args.get('pn','0').strip()
@@ -127,9 +127,12 @@ def api_crawl_page():
         return jsonify({'error':'Keyword required'}), 400
     if source == 'baidu':
         data = crawl_baidu_news(kw, pn=pn_val)
+    elif source == 'sina':
+        data = crawl_sina_news(kw, page=(pn_val//10)+1, size=10)
+    elif source == 'sohu':
+        data = crawl_sohu_news(kw, offset=pn_val, limit=10)
     elif source == 'xinhua':
-        page = max(1, int(pn_val/10)+1)
-        data = crawl_xinhua_news(kw, page=page)
+        data = crawl_xinhua_multi(kw, offset=pn_val, limit=10)
     else:
         return jsonify({'error':'Unknown source'}), 400
     return jsonify({'data': data, 'pn': pn_val, 'source': source})
@@ -146,7 +149,7 @@ def api_deep_crawl():
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        soup = BeautifulSoup(resp.content, 'html.parser')
         # naive extraction
         main = soup.find('article') or soup.find('div', class_='content') or soup.find('div', id='content') or soup.body
         text = main.get_text('\n', strip=True) if main else ''
@@ -203,7 +206,7 @@ def api_save_items():
 @login_required
 def api_crawl_auto():
     from flask import request, jsonify
-    from .crawler import crawl_baidu_news, crawl_xinhua_news
+    from .crawler import crawl_baidu_news, crawl_sina_news, crawl_sohu_news, crawl_xinhua_multi
     from .db import get_db
     import datetime, json, requests
     from bs4 import BeautifulSoup
@@ -235,7 +238,6 @@ def api_crawl_auto():
     db = get_db()
     aggregated = []
     seen = set()
-    # Iterate pages depending on source
     if source == 'baidu':
         cursor = 0
         step = 10
@@ -245,15 +247,33 @@ def api_crawl_auto():
             nonlocal cursor
             cursor += step
         limit = 200
-    elif source == 'xinhua':
-        cursor = 1
-        step = 1
+    elif source == 'sina':
+        cursor = 0
+        step = 10
         def fetch():
-            return crawl_xinhua_news(kw, page=cursor)
+            return crawl_sina_news(kw, page=(cursor//10)+1, size=step)
         def advance():
             nonlocal cursor
             cursor += step
-        limit = 50
+        limit = 200
+    elif source == 'sohu':
+        cursor = 0
+        step = 10
+        def fetch():
+            return crawl_sohu_news(kw, offset=cursor, limit=step)
+        def advance():
+            nonlocal cursor
+            cursor += step
+        limit = 200
+    elif source == 'xinhua':
+        cursor = 0
+        step = 10
+        def fetch():
+            return crawl_xinhua_multi(kw, offset=cursor, limit=step)
+        def advance():
+            nonlocal cursor
+            cursor += step
+        limit = 200
     else:
         return jsonify({'error':'Unknown source'}), 400
     while len(aggregated) < num and cursor <= limit:
@@ -283,7 +303,7 @@ def api_crawl_auto():
         try:
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            soup = BeautifulSoup(resp.content, 'html.parser')
             main = soup.find('article') or soup.find('div', class_='content') or soup.find('div', id='content') or soup.body
             content = main.get_text('\n', strip=True)[:10000] if main else ''
         except Exception:
@@ -372,6 +392,50 @@ def api_warehouse_item(item_id):
         'created_at': r['created_at']
     })
 
+@bp.route('/api/warehouse_update/<int:item_id>', methods=['POST'])
+@login_required
+def api_warehouse_update(item_id):
+    from flask import request, jsonify
+    db = get_db()
+    title = (request.form.get('title') or request.json.get('title') if request.is_json else request.form.get('title')) if request else ''
+    summary = (request.form.get('summary') or (request.json.get('summary') if request.is_json else None))
+    cover = (request.form.get('cover') or (request.json.get('cover') if request.is_json else None))
+    original_url = (request.form.get('original_url') or (request.json.get('original_url') if request.is_json else None))
+    source = (request.form.get('source') or (request.json.get('source') if request.is_json else None))
+    keyword = (request.form.get('keyword') or (request.json.get('keyword') if request.is_json else None))
+    fields = []
+    values = []
+    if title is not None:
+        fields.append('title=?'); values.append(title)
+    if summary is not None:
+        fields.append('summary=?'); values.append(summary)
+    if cover is not None:
+        fields.append('cover=?'); values.append(cover)
+    if original_url is not None:
+        fields.append('original_url=?'); values.append(original_url)
+    if source is not None:
+        fields.append('source=?'); values.append(source)
+    if keyword is not None:
+        fields.append('keyword=?'); values.append(keyword)
+    if not fields:
+        return jsonify({'updated': 0})
+    values.append(item_id)
+    db.execute(f"UPDATE crawl_items SET {', '.join(fields)} WHERE id=?", values)
+    db.commit()
+    return jsonify({'updated': 1})
+
+@bp.route('/api/warehouse_analyze/<int:item_id>', methods=['POST'])
+@login_required
+def api_warehouse_analyze(item_id):
+    from flask import jsonify
+    db = get_db()
+    r = db.execute('SELECT id, title, summary, deep_content FROM crawl_items WHERE id=?', (item_id,)).fetchone()
+    if not r:
+        return jsonify({'error': 'not found'}), 404
+    text = (r['deep_content'] or '') or (r['summary'] or '')
+    preview = (text or '')[:400]
+    return jsonify({'analysis': 'AI解析入口预留，待实现', 'preview': preview})
+
 @bp.route('/api/warehouse_delete/<int:item_id>', methods=['POST'])
 @login_required
 def api_warehouse_delete(item_id):
@@ -380,3 +444,410 @@ def api_warehouse_delete(item_id):
     db.execute('DELETE FROM crawl_items WHERE id=?', (item_id,))
     db.commit()
     return jsonify({'deleted': 1})
+
+@bp.route('/rulelib')
+@login_required
+@role_required('admin')
+def rulelib():
+    return render_template('admin/rulelib.html')
+
+@bp.route('/api/rulelib_items')
+@login_required
+@role_required('admin')
+def api_rulelib_items():
+    from flask import jsonify, request
+    import json
+    db = get_db()
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '10'))
+    except Exception:
+        page, limit = 1, 10
+    q = (request.args.get('q','') or '').strip()
+    if limit < 1:
+        limit = 10
+    if limit > 100:
+        limit = 100
+    offset = (page - 1) * limit
+    if q:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM crawl_rules WHERE site LIKE ? OR domain LIKE ?', (f'%{q}%', f'%{q}%')).fetchone()['cnt']
+        rows = db.execute('SELECT id,site,domain,title_xpath,content_xpath,headers,created_at,updated_at FROM crawl_rules WHERE site LIKE ? OR domain LIKE ? ORDER BY (updated_at IS NULL), updated_at DESC, id DESC LIMIT ? OFFSET ?', (f'%{q}%', f'%{q}%', limit, offset)).fetchall()
+    else:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM crawl_rules').fetchone()['cnt']
+        rows = db.execute('SELECT id,site,domain,title_xpath,content_xpath,headers,created_at,updated_at FROM crawl_rules ORDER BY (updated_at IS NULL), updated_at DESC, id DESC LIMIT ? OFFSET ?', (limit, offset)).fetchall()
+    items = []
+    for r in rows:
+        h = r['headers'] or ''
+        upd = r['updated_at'] or ''
+        if upd:
+            s = str(upd).replace('T', ' ')
+            if len(s) >= 16:
+                upd = s[:16]
+            else:
+                upd = s
+        items.append({
+            'id': r['id'],
+            'site': r['site'],
+            'domain': r['domain'] or '',
+            'title_xpath': r['title_xpath'] or '',
+            'content_xpath': r['content_xpath'] or '',
+            'headers': h,
+            'created_at': r['created_at'] or '',
+            'updated_at': upd
+        })
+    return jsonify({'items': items, 'total': total, 'page': page, 'limit': limit})
+
+@bp.route('/api/rulelib_create', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_rulelib_create():
+    from flask import request, jsonify
+    import datetime, json
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    site = (data.get('site') or '').strip()
+    domain = (data.get('domain') or '').strip()
+    title_xpath = (data.get('title_xpath') or '').strip()
+    content_xpath = (data.get('content_xpath') or '').strip()
+    headers = data.get('headers') or ''
+    if not site:
+        return jsonify({'error':'site required'}), 400
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    db.execute('INSERT INTO crawl_rules(site,domain,title_xpath,content_xpath,headers,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', (site, domain, title_xpath, content_xpath, headers, now, now))
+    db.commit()
+    return jsonify({'created': 1})
+
+@bp.route('/api/rulelib_update/<int:rule_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_rulelib_update(rule_id):
+    from flask import request, jsonify
+    import datetime
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    fields = []
+    values = []
+    for key in ['site','domain','title_xpath','content_xpath','headers']:
+        val = data.get(key)
+        if val is not None:
+            fields.append(f"{key}=?")
+            values.append(val)
+    if not fields:
+        return jsonify({'updated': 0})
+    values.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+    fields.append('updated_at=?')
+    values.append(rule_id)
+    db.execute(f"UPDATE crawl_rules SET {', '.join(fields)} WHERE id=?", values)
+    db.commit()
+    return jsonify({'updated': 1})
+
+@bp.route('/api/rulelib_delete/<int:rule_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_rulelib_delete(rule_id):
+    from flask import jsonify
+    db = get_db()
+    db.execute('DELETE FROM crawl_rules WHERE id=?', (rule_id,))
+    db.commit()
+    return jsonify({'deleted': 1})
+
+@bp.route('/ai_engines')
+@login_required
+@role_required('admin')
+def ai_engines():
+    return render_template('admin/ai_engines.html')
+
+@bp.route('/api/ai_engines_items')
+@login_required
+@role_required('admin')
+def api_ai_engines_items():
+    from flask import jsonify, request
+    db = get_db()
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '12'))
+    except Exception:
+        page, limit = 1, 12
+    q = (request.args.get('q','') or '').strip()
+    if limit < 1:
+        limit = 12
+    if limit > 100:
+        limit = 100
+    offset = (page - 1) * limit
+    if q:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM ai_engines WHERE provider LIKE ? OR model_name LIKE ?', (f'%{q}%', f'%{q}%')).fetchone()['cnt']
+        rows = db.execute('SELECT id,provider,api_url,model_name,description,created_at,updated_at FROM ai_engines WHERE provider LIKE ? OR model_name LIKE ? ORDER BY (updated_at IS NULL), updated_at DESC, id DESC LIMIT ? OFFSET ?', (f'%{q}%', f'%{q}%', limit, offset)).fetchall()
+    else:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM ai_engines').fetchone()['cnt']
+        rows = db.execute('SELECT id,provider,api_url,model_name,description,created_at,updated_at FROM ai_engines ORDER BY (updated_at IS NULL), updated_at DESC, id DESC LIMIT ? OFFSET ?', (limit, offset)).fetchall()
+    items = []
+    for r in rows:
+        upd = r['updated_at'] or ''
+        if upd:
+            s = str(upd).replace('T', ' ')
+            if len(s) >= 16:
+                upd = s[:16]
+            else:
+                upd = s
+        items.append({
+            'id': r['id'],
+            'provider': r['provider'],
+            'api_url': r['api_url'] or '',
+            'model_name': r['model_name'] or '',
+            'description': r['description'] or '',
+            'updated_at': upd
+        })
+    return jsonify({'items': items, 'total': total, 'page': page, 'limit': limit})
+
+@bp.route('/api/ai_engines_get/<int:engine_id>')
+@login_required
+@role_required('admin')
+def api_ai_engines_get(engine_id):
+    from flask import jsonify
+    db = get_db()
+    row = db.execute('SELECT id,provider,api_url,api_key,model_name,description,created_at,updated_at FROM ai_engines WHERE id=?', (engine_id,)).fetchone()
+    if not row:
+        return jsonify({'error':'not found'}), 404
+    return jsonify({
+        'id': row['id'],
+        'provider': row['provider'],
+        'api_url': row['api_url'] or '',
+        'api_key': row['api_key'] or '',
+        'model_name': row['model_name'] or '',
+        'description': row['description'] or '',
+        'created_at': row['created_at'] or '',
+        'updated_at': row['updated_at'] or ''
+    })
+
+@bp.route('/api/ai_engines_create', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_engines_create():
+    from flask import request, jsonify
+    import datetime
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    provider = (data.get('provider') or '').strip()
+    api_url = (data.get('api_url') or '').strip()
+    api_key = (data.get('api_key') or '').strip()
+    model_name = (data.get('model_name') or '').strip()
+    description = (data.get('description') or '').strip()
+    if not provider or not api_url or not model_name:
+        return jsonify({'error':'missing required'}), 400
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    db.execute('INSERT INTO ai_engines(provider,api_url,api_key,model_name,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', (provider, api_url, api_key, model_name, description, now, now))
+    db.commit()
+    return jsonify({'created': 1})
+
+@bp.route('/api/ai_engines_update/<int:engine_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_engines_update(engine_id):
+    from flask import request, jsonify
+    import datetime
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    fields = []
+    values = []
+    for key in ['provider','api_url','api_key','model_name','description']:
+        val = data.get(key)
+        if val is not None:
+            fields.append(f"{key}=?")
+            values.append(val)
+    if not fields:
+        return jsonify({'updated': 0})
+    values.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+    fields.append('updated_at=?')
+    values.append(engine_id)
+    db.execute(f"UPDATE ai_engines SET {', '.join(fields)} WHERE id=?", values)
+    db.commit()
+    return jsonify({'updated': 1})
+
+@bp.route('/api/ai_engines_delete/<int:engine_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_engines_delete(engine_id):
+    from flask import jsonify
+    db = get_db()
+    db.execute('DELETE FROM ai_engines WHERE id=?', (engine_id,))
+    db.commit()
+    return jsonify({'deleted': 1})
+
+# AI Assistants
+@bp.route('/ai_assistants')
+@login_required
+@role_required('admin')
+def ai_assistants():
+    return render_template('admin/ai_assistants.html')
+
+@bp.route('/ai_assistants/<int:assistant_id>')
+@login_required
+@role_required('admin')
+def ai_assistants_chat_page(assistant_id):
+    return render_template('admin/ai_chat.html', assistant_id=assistant_id)
+
+@bp.route('/api/ai_assistants_items')
+@login_required
+@role_required('admin')
+def api_ai_assistants_items():
+    from flask import jsonify, request
+    db = get_db()
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '12'))
+    except Exception:
+        page, limit = 1, 12
+    q = (request.args.get('q','') or '').strip()
+    if limit < 1:
+        limit = 12
+    if limit > 100:
+        limit = 100
+    offset = (page - 1) * limit
+    if q:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM ai_assistants WHERE name LIKE ?', (f'%{q}%',)).fetchone()['cnt']
+        rows = db.execute('SELECT a.id,a.name,a.engine_id,a.system_prompt,a.created_at,a.updated_at,e.provider,e.model_name FROM ai_assistants a LEFT JOIN ai_engines e ON a.engine_id=e.id WHERE a.name LIKE ? ORDER BY (a.updated_at IS NULL), a.updated_at DESC, a.id DESC LIMIT ? OFFSET ?', (f'%{q}%', limit, offset)).fetchall()
+    else:
+        total = db.execute('SELECT COUNT(1) AS cnt FROM ai_assistants').fetchone()['cnt']
+        rows = db.execute('SELECT a.id,a.name,a.engine_id,a.system_prompt,a.created_at,a.updated_at,e.provider,e.model_name FROM ai_assistants a LEFT JOIN ai_engines e ON a.engine_id=e.id ORDER BY (a.updated_at IS NULL), a.updated_at DESC, a.id DESC LIMIT ? OFFSET ?', (limit, offset)).fetchall()
+    items = []
+    for r in rows:
+        upd = r['updated_at'] or ''
+        if upd:
+            s = str(upd).replace('T', ' ')
+            upd = s[:16] if len(s) >= 16 else s
+        items.append({
+            'id': r['id'],
+            'name': r['name'],
+            'engine_id': r['engine_id'],
+            'provider': r['provider'] or '',
+            'model_name': r['model_name'] or '',
+            'updated_at': upd,
+            'system_prompt': r['system_prompt'] or ''
+        })
+    return jsonify({'items': items, 'total': total, 'page': page, 'limit': limit})
+
+@bp.route('/api/ai_assistants_get/<int:assistant_id>')
+@login_required
+@role_required('admin')
+def api_ai_assistants_get(assistant_id):
+    from flask import jsonify
+    db = get_db()
+    row = db.execute('SELECT id,name,engine_id,system_prompt,created_at,updated_at FROM ai_assistants WHERE id=?', (assistant_id,)).fetchone()
+    if not row:
+        return jsonify({'error':'not found'}), 404
+    return jsonify({
+        'id': row['id'],
+        'name': row['name'],
+        'engine_id': row['engine_id'],
+        'system_prompt': row['system_prompt'] or '',
+        'created_at': row['created_at'] or '',
+        'updated_at': row['updated_at'] or ''
+    })
+
+@bp.route('/api/ai_assistants_create', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_assistants_create():
+    from flask import request, jsonify
+    import datetime
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    name = (data.get('name') or '').strip()
+    engine_id = data.get('engine_id')
+    prompt = (data.get('system_prompt') or '').strip()
+    try:
+        engine_id = int(engine_id)
+    except Exception:
+        return jsonify({'error':'invalid engine_id'}), 400
+    if not name:
+        return jsonify({'error':'name required'}), 400
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    db.execute('INSERT INTO ai_assistants(name,engine_id,system_prompt,created_at,updated_at) VALUES(?,?,?,?,?)', (name, engine_id, prompt, now, now))
+    db.commit()
+    return jsonify({'created': 1})
+
+@bp.route('/api/ai_assistants_update/<int:assistant_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_assistants_update(assistant_id):
+    from flask import request, jsonify
+    import datetime
+    db = get_db()
+    data = request.json if request.is_json else request.form
+    fields = []
+    values = []
+    for key in ['name','engine_id','system_prompt']:
+        val = data.get(key)
+        if val is not None:
+            fields.append(f"{key}=?")
+            values.append(val)
+    if not fields:
+        return jsonify({'updated': 0})
+    values.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+    fields.append('updated_at=?')
+    values.append(assistant_id)
+    db.execute(f"UPDATE ai_assistants SET {', '.join(fields)} WHERE id=?", values)
+    db.commit()
+    return jsonify({'updated': 1})
+
+@bp.route('/api/ai_assistants_delete/<int:assistant_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_assistants_delete(assistant_id):
+    from flask import jsonify
+    db = get_db()
+    db.execute('DELETE FROM ai_messages WHERE assistant_id=?', (assistant_id,))
+    db.execute('DELETE FROM ai_assistants WHERE id=?', (assistant_id,))
+    db.commit()
+    return jsonify({'deleted': 1})
+
+@bp.route('/api/ai_assistants_chat/<int:assistant_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_ai_assistants_chat(assistant_id):
+    from flask import request, jsonify
+    import datetime, requests, json
+    db = get_db()
+    assistant = db.execute('SELECT id,name,engine_id,system_prompt FROM ai_assistants WHERE id=?', (assistant_id,)).fetchone()
+    if not assistant:
+        return jsonify({'error':'assistant not found'}), 404
+    engine = db.execute('SELECT id,provider,api_url,api_key,model_name FROM ai_engines WHERE id=?', (assistant['engine_id'],)).fetchone()
+    if not engine:
+        return jsonify({'error':'engine not found'}), 404
+    text = (request.json.get('text') if request.is_json else request.form.get('text')) or ''
+    text = text.strip()
+    if not text:
+        return jsonify({'error':'text required'}), 400
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    db.execute('INSERT INTO ai_messages(assistant_id,role,content,created_at) VALUES(?,?,?,?)', (assistant_id, 'user', text, now))
+    db.commit()
+    rows = db.execute('SELECT role, content FROM ai_messages WHERE assistant_id=? ORDER BY id DESC LIMIT 20', (assistant_id,)).fetchall()
+    history = [{'role': r['role'], 'content': r['content']} for r in reversed(rows)]
+    messages = []
+    if assistant['system_prompt']:
+        messages.append({'role':'system','content': assistant['system_prompt']})
+    messages.extend(history)
+    endpoint = (engine['api_url'] or '').rstrip('/') + '/chat/completions'
+    payload = {
+        'model': engine['model_name'],
+        'messages': messages,
+        'temperature': 0.7,
+        'stream': False
+    }
+    headers = {'Content-Type': 'application/json'}
+    if engine['api_key']:
+        headers['Authorization'] = 'Bearer ' + engine['api_key']
+    try:
+        resp = requests.post(endpoint, headers=headers, data=json.dumps(payload), timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        content = ''
+        try:
+            content = data['choices'][0]['message']['content']
+        except Exception:
+            content = json.dumps(data, ensure_ascii=False)
+    except Exception as e:
+        content = '调用失败: ' + str(e)
+    db.execute('INSERT INTO ai_messages(assistant_id,role,content,created_at) VALUES(?,?,?,?)', (assistant_id, 'assistant', content, now))
+    db.commit()
+    return jsonify({'reply': content})

@@ -3,6 +3,7 @@
 <div class="layui-card">
   <div class="layui-card-header">数据采集管理</div>
   <div class="layui-card-body">
+    
     <div class="layui-form">
       <div class="layui-form-item">
         <div class="layui-inline">
@@ -16,7 +17,9 @@
           <div class="layui-input-inline" style="width: 180px;">
             <select id="source">
               <option value="baidu">百度新闻</option>
-              <option value="xinhua">新华搜索</option>
+              <option value="sina">新浪新闻</option>
+              <option value="sohu">搜狐新闻</option>
+              <option value="xinhua">新华网</option>
             </select>
           </div>
         </div>
@@ -32,10 +35,10 @@
         <div class="layui-inline">
           <input type="checkbox" id="auto-mode" lay-skin="switch" lay-text="自动保存|手动模式" checked>
         </div>
+        
       </div>
     </div>
     <div style="margin:10px 0">
-      <div id="source-banner" style="margin-bottom:10px;color:#666">采集来源：<span id="source-text" class="layui-badge layui-bg-blue">百度新闻</span></div>
       <div style="height:12px;background:#f2f2f2;border-radius:6px;overflow:hidden">
         <div id="progress" style="height:12px;width:0;background:#1E9FFF"></div>
       </div>
@@ -46,55 +49,107 @@
       <button class="layui-btn layui-btn-normal" id="btn-save-selected">保存选中</button>
     </div>
 
-    <table class="layui-table">
+    <div class="table-responsive">
+    <table class="layui-table" style="table-layout:fixed;width:100%">
+      <colgroup>
+        <col style="width:6%">
+        <col style="width:12%">
+        <col style="width:30%">
+        <col style="width:30%">
+        <col style="width:8%">
+        <col style="width:6%">
+        <col style="width:8%">
+      </colgroup>
       <thead>
         <tr>
-          <th style="width:60px">选择</th>
-          <th style="width:80px">封面</th>
+          <th>选择</th>
+          <th>封面</th>
           <th>标题</th>
-          <th style="width:30%">概要</th>
-          <th style="width:120px">来源</th>
-          <th style="width:22%">URL</th>
-          <th style="width:160px">操作</th>
+          <th>概要</th>
+          <th>来源</th>
+          <th>URL</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
     </table>
+    </div>
     <div id="pager" style="text-align:center;margin-top:10px"></div>
   </div>
 </div>
 {% endblock %}
 {% block page_script %}
+<style>
+#pager{position:relative;z-index:10;padding:10px 0;background:#fff}
+.layui-laypage{z-index:10}
+.table-responsive{width:100%;overflow-x:auto}
+.cell-cover img{width:96px;height:64px;object-fit:cover;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.12)}
+.cover-box{width:96px;height:64px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.12);background-size:cover;background-position:center;background-repeat:no-repeat}
+.cell-title a,.cell-url a{color:#1E9FFF}
+.cell-title a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.cell-summary{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.cell-url a{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-source{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-ops{display:flex;align-items:center;gap:8px}
+.action-btn{margin-right:6px}
+.action-btn:last-child{margin-right:0}
+@media (max-width: 1280px){
+  .cover-box{width:88px;height:58px}
+}
+@media (max-width: 992px){
+  .cover-box{width:80px;height:54px}
+  .layui-form-item .layui-inline{display:block;margin-right:0}
+}
+@media (max-width: 768px){
+  .cover-box{width:74px;height:50px}
+  .layui-form-item .layui-inline{display:block;margin-right:0}
+  .layui-table thead tr th:nth-child(5), .layui-table tbody tr td:nth-child(5){display:none}
+}
+</style>
 <script>
-layui.use(['jquery','layer','laypage'], function(){
-  var $ = layui.jquery; var layer = layui.layer; var laypage = layui.laypage;
+layui.use(['jquery','layer','laypage','form'], function(){
+  var $ = layui.jquery; var layer = layui.layer; var laypage = layui.laypage; var form = layui.form;
   var aggregated = []; var selected = new Set(); var currPage = 1; var pageSize = 10;
-  var DEFAULT_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect width="100%" height="100%" fill="%23f5f5f5"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="12">无图</text></svg>';
+  var DEFAULT_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23f5f7fa"/><stop offset="1" stop-color="%23e6ebf5"/></linearGradient></defs><rect width="100%" height="100%" fill="url(%23g)"/><circle cx="76" cy="18" r="6" fill="%23c9d2e3"/><path d="M10 48 L34 28 L50 40 L62 32 L86 52 L10 52 Z" fill="%23c9d2e3"/></svg>';
+  function normalizeCover(url){
+    url = String(url||'').trim();
+    if(!url) return DEFAULT_COVER;
+    if(url.indexOf('<')>=0 || url.indexOf('>')>=0) return DEFAULT_COVER;
+    if(/style\s*=/.test(url)) return DEFAULT_COVER;
+    if(/^data:image\//.test(url)) return url;
+    if(!(url.indexOf('http://')===0 || url.indexOf('https://')===0)) return DEFAULT_COVER;
+    return url;
+  }
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function updateSourceLabel(){
-    var map = {baidu: '百度新闻', xinhua: '新华搜索'};
-    var val = $('#source').val();
+    var map = {baidu: '百度新闻', sina: '新浪新闻', sohu: '搜狐新闻', xinhua: '新华网'};
+    var val = getSource();
     $('#source-text').text(map[val]||'未知');
   }
+  function getSource(){
+    var sel = $('#source').val();
+    return sel||'baidu';
+  }
+  form.render('select');
   function renderCards(){
     var start = (currPage - 1) * pageSize; var end = start + pageSize;
     var slice = aggregated.slice(start, end);
     var html = '';
     slice.forEach(function(item, i){
       var idx = start + i;
-      var coverSrc = item.cover && (item.cover.indexOf('http://')===0 || item.cover.indexOf('https://')===0) ? item.cover : DEFAULT_COVER;
-      var coverCell = '<a href="'+(item.original_url||'#')+'" target="_blank"><img src="'+coverSrc+'" onerror="this.onerror=null;this.src=\''+DEFAULT_COVER+'\'" style="width:60px;height:60px;object-fit:cover;border-radius:4px" referrerpolicy="no-referrer"></a>';
+      var coverSrc = normalizeCover(item.cover);
+      var safeUrl = String(coverSrc).replace(/'/g, "\\'");
+      var coverCell = '<a href="'+(item.original_url||'#')+'" target="_blank" class="cell-cover"><div class="cover-box" style="background-image:url(\''+safeUrl+'\')"></div></a>';
       html += '<tr>';
       html += '<td><input type="checkbox" data-idx="'+idx+'" '+(selected.has(idx)?'checked':'')+'></td>';
       html += '<td>'+coverCell+'</td>';
-      html += '<td><a href="'+(item.original_url||'#')+'" target="_blank" style="color:#1E9FFF">'+(item.title||'')+'</a></td>';
-      html += '<td>'+(item.summary||'')+'</td>';
-      html += '<td>'+(item.source||'未知')+'</td>';
-      html += '<td><a href="'+(item.original_url||'#')+'" target="_blank" style="color:#1E9FFF">'+(item.original_url||'')+'</a></td>';
-      html += '<td>'+
-              '<button class="layui-btn layui-btn-xs" data-action="open" data-idx="'+idx+'">打开原网页</button> '+
-              '<button class="layui-btn layui-btn-warm layui-btn-xs" data-action="deep" data-idx="'+idx+'">深度采集</button> '+
-              '<span style="font-size:12px;color:'+(item.deep_crawled?'#16b777':'#ff5722')+'">'+(item.deep_crawled?'已深度采集':'未深度采集')+'</span>'+
+      html += '<td class="cell-title"><a href="'+(item.original_url||'#')+'" target="_blank">'+esc(item.title||'')+'</a></td>';
+      html += '<td class="cell-summary">'+esc(item.summary||'')+'</td>';
+      html += '<td class="cell-source">'+esc(item.source||'未知')+'</td>';
+      html += '<td class="cell-url"><a href="'+(item.original_url||'#')+'" target="_blank">'+esc(item.original_url||'')+'</a></td>';
+      html += '<td class="cell-ops">'+
+              '<button class="layui-btn layui-btn-primary layui-btn-xs action-btn" data-action="deep" data-idx="'+idx+'">深度采集</button>'+
+              '<span class="status" style="font-size:12px;color:'+(item.deep_crawled?'#16b777':'#ff5722')+'">'+(item.deep_crawled?'已深度采集':'未深度采集')+'</span>'+
               '</td>';
       html += '</tr>';
     });
@@ -126,7 +181,6 @@ layui.use(['jquery','layer','laypage'], function(){
     var idx = parseInt($(this).attr('data-idx'),10);
     var it = aggregated[idx];
     if(!it || !it.original_url){ layer.msg('无有效链接',{icon:0}); return; }
-    window.open(it.original_url, '_blank');
     layer.msg('深度采集中...', {icon: 16, time: 1000});
     $.ajax({
       url: "{{ url_for('admin.api_deep_crawl') }}",
@@ -189,7 +243,7 @@ layui.use(['jquery','layer','laypage'], function(){
         url: "{{ url_for('admin.api_crawl_auto') }}",
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify({keyword: kw, num: num, source: $('#source').val()}),
+        data: JSON.stringify({keyword: kw, num: num, source: getSource()}),
         success: function(res){
           $('#progress').css('width','100%'); $('#progress-text').text('进度：100%');
           layer.msg('已保存 '+(res.saved||0)+' 条',{icon:1});
@@ -198,11 +252,13 @@ layui.use(['jquery','layer','laypage'], function(){
       });
       return;
     }
+    $('#progress').css('width','0%'); $('#progress-text').text('进度：0%');
+    layer.msg('采集中...', {icon: 16, time: 1000});
     var pages = Math.ceil(num/10); var done = 0;
     function fetchPage(pn){
       $.ajax({
         url: "{{ url_for('admin.api_crawl_page') }}",
-        data: {keyword: kw, pn: pn, source: $('#source').val()},
+        data: {keyword: kw, pn: pn, source: getSource()},
         success: function(res){
           var list = res.data || [];
           list.forEach(function(it){

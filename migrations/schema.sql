@@ -47,3 +47,44 @@ CREATE TABLE IF NOT EXISTS crawl_items (
   created_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_crawl_items_url ON crawl_items(original_url);
+CREATE TABLE IF NOT EXISTS crawl_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site TEXT NOT NULL,
+  domain TEXT,
+  title_xpath TEXT,
+  content_xpath TEXT,
+  headers TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_crawl_rules_site ON crawl_rules(site);
+CREATE TABLE IF NOT EXISTS ai_engines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL,
+  api_url TEXT NOT NULL,
+  api_key TEXT,
+  model_name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ai_engines_provider ON ai_engines(provider);
+CREATE TABLE IF NOT EXISTS ai_assistants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  engine_id INTEGER NOT NULL,
+  system_prompt TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  FOREIGN KEY(engine_id) REFERENCES ai_engines(id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_assistants_engine ON ai_assistants(engine_id);
+CREATE TABLE IF NOT EXISTS ai_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  assistant_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT,
+  FOREIGN KEY(assistant_id) REFERENCES ai_assistants(id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_messages_asst ON ai_messages(assistant_id);

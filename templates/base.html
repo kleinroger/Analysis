@@ -10,6 +10,7 @@
 <div class="layui-header">
 <div class="layui-logo">{{ app_name }}</div>
 <ul class="layui-nav layui-layout-right">
+<li class="layui-nav-item"><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></li>
 <li class="layui-nav-item"><a href="{{ url_for('auth.logout') }}">退出</a></li>
 </ul>
 </div>
@@ -22,7 +23,10 @@
 <li class="layui-nav-item"><a href="{{ url_for('admin.index') }}">后台管理</a></li>
 {% endif %}
 <li class="layui-nav-item"><a href="{{ url_for('admin.crawls') }}">数据采集管理</a></li>
-<li class="layui-nav-item"><a href="{{ url_for('admin.warehouse') }}">数据仓库</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('admin.rulelib') }}">采集规则库管理</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('admin.ai_assistants') }}">AI助手</a></li>
+<li class="layui-nav-item"><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></li>
 <li class="layui-nav-item"><a href="{{ url_for('admin.settings') }}">系统设置</a></li>
 </ul>
 </div>
@@ -32,7 +36,7 @@
 {% block content %}{% endblock %}
 </div>
 </div>
-<div class="layui-footer">© 2025</div>
+ 
 </div>
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
 <script>

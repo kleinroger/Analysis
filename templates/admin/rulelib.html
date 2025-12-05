@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">采集规则库管理</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">搜索</label>
+          <div class="layui-input-inline" style="width:300px">
+            <input type="text" id="q" placeholder="按站点或域名搜索" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-inline">
+          <button class="layui-btn" id="btn-search"><i class="layui-icon layui-icon-search"></i> 查询</button>
+          <button class="layui-btn layui-btn-primary" id="btn-refresh"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+          <button class="layui-btn layui-btn-normal" id="btn-add"><i class="layui-icon layui-icon-add-1"></i> 新增规则</button>
+        </div>
+      </div>
+    </div>
+
+    <table class="layui-table" id="rulelib-table" style="table-layout:fixed">
+      <colgroup>
+        <col style="width:16%">
+        <col style="width:16%">
+        <col style="width:18%">
+        <col style="width:18%">
+        <col style="width:18%">
+        <col style="width:120px">
+        <col style="width:180px">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="th-site">站点</th>
+          <th class="th-domain">域名</th>
+          <th class="th-title">标题XPath</th>
+          <th class="th-content">内容XPath</th>
+          <th class="th-headers">Headers</th>
+          <th class="th-updated">更新时间</th>
+          <th class="th-ops">操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="pager" style="text-align:center;margin-top:10px"></div>
+  </div>
+</div>
+{% endblock %}
+{% block page_script %}
+<script>
+layui.use(['jquery','layer','laypage','form'], function(){
+  var $ = layui.jquery; var layer = layui.layer; var laypage = layui.laypage; var form = layui.form;
+  var cache = []; var total = 0; var page = 1; var limit = 10; var q = '';
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var style = document.createElement('style');
+  style.textContent = [
+    '#rulelib-table th.th-site{width:16%}',
+    '#rulelib-table th.th-domain{width:16%}',
+    '#rulelib-table th.th-title{width:18%}',
+    '#rulelib-table th.th-content{width:18%}',
+    '#rulelib-table th.th-headers{width:18%}',
+    '#rulelib-table th.th-updated{width:120px}',
+    '#rulelib-table th.th-ops{width:180px}',
+    '#rulelib-table td{vertical-align:top}',
+    '#rulelib-table td.cell-site, #rulelib-table td.cell-domain{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}',
+    '#rulelib-table td.cell-title .text, #rulelib-table td.cell-content .text{display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-all; overflow-wrap:anywhere}',
+    '#rulelib-table td.cell-headers{font-size:12px;color:#666}',
+    '#rulelib-table td.cell-headers div{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; word-break:break-all; overflow-wrap:anywhere}',
+    '#pager{position:relative;z-index:10;padding:10px 0;background:#fff}',
+    '.layui-laypage{z-index:10}'
+  ].join('\n');
+  document.head.appendChild(style);
+  function render(){
+    var html = '';
+    cache.forEach(function(it){
+      html += '<tr>'+
+              '<td class="cell-site">'+esc(it.site||'')+'</td>'+
+              '<td class="cell-domain">'+esc(it.domain||'')+'</td>'+
+              '<td class="cell-title"><div class="text">'+esc(it.title_xpath||'')+'</div></td>'+
+              '<td class="cell-content"><div class="text">'+esc(it.content_xpath||'')+'</div></td>'+
+              '<td class="cell-headers"><div>'+esc(it.headers||'')+'</div></td>'+
+              '<td class="cell-updated">'+esc(it.updated_at||'')+'</td>'+
+              '<td>'+
+                '<button class="layui-btn layui-btn-warm layui-btn-xs" data-action="edit" data-id="'+it.id+'">编辑</button> '+
+                '<button class="layui-btn layui-btn-danger layui-btn-xs" data-action="del" data-id="'+it.id+'">删除</button>'+
+              '</td>'+
+              '</tr>';
+    });
+    $('#tbody').html(html);
+  }
+  function renderPager(){
+    laypage.render({
+      elem: 'pager',
+      count: total,
+      limit: limit,
+      curr: page,
+      layout: ['prev','page','next','count'],
+      jump: function(obj, first){
+        page = obj.curr; limit = obj.limit;
+        if(!first){ fetch(); }
+      }
+    });
+  }
+  function fetch(){
+    $.get("{{ url_for('admin.api_rulelib_items') }}", {page: page, limit: limit, q: q}).done(function(res){
+      cache = res.items || []; total = res.total || 0; render(); renderPager();
+    }).fail(function(){ layer.msg('加载失败',{icon:2}); });
+  }
+  function openEdit(rule){
+    var it = rule || {};
+    var formHtml = '<div style="padding:12px">'+
+      '<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="edit-site" class="layui-input" value="'+(esc(it.site||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">域名</label><div class="layui-input-block"><input id="edit-domain" class="layui-input" value="'+(esc(it.domain||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="edit-title-xpath" class="layui-input" value="'+(esc(it.title_xpath||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="edit-content-xpath" class="layui-input" value="'+(esc(it.content_xpath||''))+'"></div></div>'+
+      '<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="edit-headers" class="layui-textarea" placeholder="JSON 格式">'+(esc(it.headers||''))+'</textarea></div></div>'+
+      '</div>';
+    layer.open({
+      title: rule ? '编辑规则' : '新增规则',
+      area: ['740px','600px'],
+      content: formHtml,
+      btn: ['保存','取消'],
+      yes: function(index){
+        var payload = {
+          site: $('#edit-site').val().trim(),
+          domain: $('#edit-domain').val().trim(),
+          title_xpath: $('#edit-title-xpath').val().trim(),
+          content_xpath: $('#edit-content-xpath').val().trim(),
+          headers: $('#edit-headers').val()
+        };
+        if(!payload.site){ layer.msg('请填写站点',{icon:0}); return; }
+        var url = rule ? "{{ url_for('admin.api_rulelib_update', rule_id=0) }}".replace('0', rule.id) : "{{ url_for('admin.api_rulelib_create') }}";
+        $.ajax({ url: url, method: 'POST', contentType: 'application/json', data: JSON.stringify(payload) })
+          .done(function(){ layer.msg('已保存',{icon:1}); layer.close(index); fetch(); })
+          .fail(function(){ layer.msg('保存失败',{icon:2}); });
+      }
+    });
+  }
+  $('#btn-add').on('click', function(){ openEdit(null); });
+  $('#btn-search').on('click', function(){ q = $('#q').val().trim(); page = 1; fetch(); });
+  $('#btn-refresh').on('click', function(){ fetch(); });
+  $('#tbody').on('click','button[data-action=edit]', function(){
+    var id = $(this).attr('data-id');
+    var it = cache.find(function(x){ return String(x.id)===String(id); });
+    openEdit(it||null);
+  });
+  $('#tbody').on('click','button[data-action=del]', function(){
+    var id = $(this).attr('data-id');
+    layer.confirm('确认删除该规则？', function(idx){
+      $.post("{{ url_for('admin.api_rulelib_delete', rule_id=0) }}".replace('0', id), {})
+        .done(function(){ layer.msg('已删除',{icon:1}); fetch(); })
+        .fail(function(){ layer.msg('删除失败',{icon:2}); });
+      layer.close(idx);
+    });
+  });
+  fetch();
+});
+</script>
+{% endblock %}

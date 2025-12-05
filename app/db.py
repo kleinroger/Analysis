@@ -75,3 +75,26 @@ def init_app(app):
             db.execute("ALTER TABLE crawl_items ADD COLUMN detail_json TEXT")
         db.commit()
         click.echo('migrated')
+
+    @app.cli.command('add-ai-engine')
+    @click.option('--provider', required=True)
+    @click.option('--api-url', required=True)
+    @click.option('--api-key', required=False)
+    @click.option('--model-name', required=True)
+    @click.option('--description', required=False, default='')
+    def add_ai_engine(provider, api_url, api_key, model_name, description):
+        db = get_db()
+        import datetime
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        provider = (provider or '').strip()
+        api_url = (api_url or '').strip()
+        api_key = (api_key or '').strip()
+        model_name = (model_name or '').strip()
+        description = (description or '').strip()
+        row = db.execute('SELECT id FROM ai_engines WHERE provider=? AND model_name=?', (provider, model_name)).fetchone()
+        if row:
+            db.execute('UPDATE ai_engines SET api_url=?, api_key=?, description=?, updated_at=? WHERE id=?', (api_url, api_key, description, now, row['id']))
+        else:
+            db.execute('INSERT INTO ai_engines(provider,api_url,api_key,model_name,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', (provider, api_url, api_key, model_name, description, now, now))
+        db.commit()
+        click.echo('ok')

@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">AI助手</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">搜索</label>
+          <div class="layui-input-inline" style="width:300px">
+            <input type="text" id="q" placeholder="按名称搜索助手" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-inline">
+          <button class="layui-btn" id="btn-search"><i class="layui-icon layui-icon-search"></i> 查询</button>
+          <button class="layui-btn layui-btn-primary" id="btn-refresh"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+          <button class="layui-btn layui-btn-normal" id="btn-add"><i class="layui-icon layui-icon-add-1"></i> 新增助手</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="grid" class="assistant-grid"></div>
+    <div id="pager" style="text-align:center;margin-top:10px"></div>
+  </div>
+</div>
+{% endblock %}
+{% block page_script %}
+<style>
+.assistant-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media (max-width: 1280px){.assistant-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width: 992px){.assistant-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width: 640px){.assistant-grid{grid-template-columns:repeat(1,1fr)}}
+.assistant-card{border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.08);background:#fff}
+.assistant-card-header{padding:16px;color:#fff;background:linear-gradient(135deg,#16b777,#1E9FFF)}
+.assistant-card-body{padding:14px}
+.kv{display:flex;align-items:center;margin-bottom:8px}
+.kv .k{width:92px;color:#666}
+.kv .v{flex:1;min-width:0}
+.text-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ops{display:flex;align-items:center;gap:8px;margin-top:10px}
+</style>
+<script>
+layui.use(['jquery','layer','laypage','form'], function(){
+  var $ = layui.jquery; var layer = layui.layer; var laypage = layui.laypage; var form = layui.form;
+  var cache = []; var total = 0; var page = 1; var limit = 12; var q = '';
+  var engines = [];
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function render(){
+    var html = '';
+    cache.forEach(function(it){
+      html += '<div class="assistant-card">'+
+                '<div class="assistant-card-header">'+
+                  '<div style="font-size:18px;font-weight:600" class="text-ellipsis">'+esc(it.name)+'</div>'+
+                  '<div style="font-size:12px;opacity:.9" class="text-ellipsis">'+esc(it.provider)+' · '+esc(it.model_name)+' · '+esc(it.updated_at||'')+'</div>'+
+                '</div>'+
+                '<div class="assistant-card-body">'+
+                  '<div class="kv"><div class="k">模型</div><div class="v text-ellipsis">'+esc(it.provider)+' / '+esc(it.model_name)+'</div></div>'+
+                  '<div class="kv"><div class="k">提示词</div><div class="v text-ellipsis" title="'+esc(it.system_prompt)+'">'+esc(it.system_prompt)+'</div></div>'+
+                  '<div class="ops">'+
+                    '<a class="layui-btn layui-btn-primary layui-btn-xs" href="{{ url_for('admin.ai_assistants_chat_page', assistant_id=0) }}'.replace('0', it.id)+'">进入对话</a>'+
+                    '<button class="layui-btn layui-btn-warm layui-btn-xs" data-action="edit" data-id="'+it.id+'">编辑</button>'+
+                    '<button class="layui-btn layui-btn-danger layui-btn-xs" data-action="del" data-id="'+it.id+'">删除</button>'+
+                  '</div>'+
+                '</div>'+
+              '</div>';
+    });
+    $('#grid').html(html);
+  }
+  function renderPager(){
+    laypage.render({
+      elem: 'pager', count: total, limit: limit, curr: page,
+      layout: ['prev','page','next','count'],
+      jump: function(obj, first){ page = obj.curr; limit = obj.limit; if(!first){ fetch(); } }
+    });
+  }
+  function fetch(){
+    $.get("{{ url_for('admin.api_ai_assistants_items') }}", {page: page, limit: limit, q: q}).done(function(res){
+      cache = res.items || []; total = res.total || 0; render(); renderPager();
+    }).fail(function(){ layer.msg('加载失败',{icon:2}); });
+  }
+  function loadEngines(cb){
+    $.get("{{ url_for('admin.api_ai_engines_items') }}", {page: 1, limit: 100, q: ''}).done(function(res){ engines = res.items||[]; cb&&cb(); }).fail(function(){ engines=[]; cb&&cb(); });
+  }
+  function openEdit(asst){
+    var it = asst || {};
+    function fillAndOpen(){
+      var options = engines.map(function(e){ return '<option value="'+e.id+'">'+esc(e.provider)+' · '+esc(e.model_name)+'</option>'; }).join('');
+      var formHtml = '<div style="padding:12px">'+
+        '<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="edit-name" class="layui-input" value="'+(esc(it.name||''))+'"></div></div>'+
+        '<div class="layui-form-item"><label class="layui-form-label">选择模型</label><div class="layui-input-block"><select id="edit-engine" class="layui-input">'+options+'</select></div></div>'+
+        '<div class="layui-form-item"><label class="layui-form-label">提示词</label><div class="layui-input-block"><textarea id="edit-prompt" class="layui-textarea" placeholder="该助手的系统提示词">'+(esc(it.system_prompt||''))+'</textarea></div></div>'+
+      '</div>';
+      layer.open({
+        title: asst ? '编辑助手' : '新增助手', area: ['720px','560px'], content: formHtml, btn: ['保存','取消'],
+        success: function(){ if(it.engine_id){ $('#edit-engine').val(String(it.engine_id)); } },
+        yes: function(index){
+          var payload = {
+            name: $('#edit-name').val().trim(),
+            engine_id: $('#edit-engine').val(),
+            system_prompt: $('#edit-prompt').val()
+          };
+          if(!payload.name || !payload.engine_id){ layer.msg('请填写必填项',{icon:0}); return; }
+          var url = asst ? "{{ url_for('admin.api_ai_assistants_update', assistant_id=0) }}".replace('0', asst.id) : "{{ url_for('admin.api_ai_assistants_create') }}";
+          $.ajax({ url: url, method: 'POST', contentType: 'application/json', data: JSON.stringify(payload) })
+            .done(function(){ layer.msg('已保存',{icon:1}); layer.close(index); fetch(); })
+            .fail(function(){ layer.msg('保存失败',{icon:2}); });
+        }
+      });
+    }
+    if(asst){ $.get("{{ url_for('admin.api_ai_assistants_get', assistant_id=0) }}".replace('0', asst.id)).done(function(res){ it = res || it; loadEngines(fillAndOpen); }).fail(function(){ loadEngines(fillAndOpen); }); }
+    else { loadEngines(fillAndOpen); }
+  }
+  $('#btn-add').on('click', function(){ openEdit(null); });
+  $('#btn-search').on('click', function(){ q = $('#q').val().trim(); page = 1; fetch(); });
+  $('#btn-refresh').on('click', function(){ fetch(); });
+  $('#grid').on('click','button[data-action=edit]', function(){ var id = $(this).attr('data-id'); var it = cache.find(function(x){ return String(x.id)===String(id); }); openEdit(it||null); });
+  $('#grid').on('click','button[data-action=del]', function(){ var id = $(this).attr('data-id'); layer.confirm('确认删除该助手？', function(idx){ $.post("{{ url_for('admin.api_ai_assistants_delete', assistant_id=0) }}".replace('0', id), {}).done(function(){ layer.msg('已删除',{icon:1}); fetch(); }).fail(function(){ layer.msg('删除失败',{icon:2}); }); layer.close(idx); }); });
+  fetch();
+});
+</script>
+{% endblock %}
