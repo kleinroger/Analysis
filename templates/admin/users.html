@@ -1,0 +1,557 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* 用户管理模块样式 */
+  .users-container {
+    padding: 0;
+  }
+  
+  /* 顶部区域 */
+  .page-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: 12px;
+    padding: 25px 30px;
+    margin-bottom: 20px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .page-header::before {
+    content: '';
+    position: absolute;
+    right: -30px;
+    top: -30px;
+    width: 150px;
+    height: 150px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  
+  .header-info h2 {
+    margin: 0 0 8px 0;
+    font-size: 22px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+  
+  .header-info h2 i {
+    margin-right: 10px;
+    font-size: 26px;
+  }
+  
+  .header-info p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 14px;
+  }
+  
+  .header-action .layui-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0 25px;
+    height: 40px;
+    line-height: 40px;
+    font-size: 14px;
+    transition: all 0.3s;
+  }
+  
+  .header-action .layui-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
+  }
+
+  /* 统计卡片 */
+  .stat-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .stat-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 25px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  }
+  
+  .stat-card .icon-wrap {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .stat-card .icon-wrap i {
+    font-size: 24px;
+    color: #fff;
+  }
+  
+  .stat-card .icon-wrap.purple {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  }
+  
+  .stat-card .icon-wrap.blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  }
+  
+  .stat-card .icon-wrap.green {
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  }
+  
+  .stat-card .stat-info .num {
+    font-size: 26px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .stat-card .stat-info .label {
+    font-size: 13px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* 用户列表 */
+  .user-list-panel {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  
+  .panel-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+  }
+  
+  .panel-title i {
+    margin-right: 8px;
+    color: #6366f1;
+  }
+
+  /* 用户卡片网格 */
+  .user-grid {
+    padding: 25px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  
+  .user-card {
+    background: #fafbfc;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s;
+    border: 1px solid #f0f0f0;
+    position: relative;
+  }
+  
+  .user-card:hover {
+    background: #fff;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    transform: translateY(-3px);
+    border-color: #e0e0e0;
+  }
+  
+  .user-card .user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 24px;
+    color: #fff;
+    font-weight: bold;
+  }
+  
+  .user-card .user-name {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  
+  .user-card .user-role {
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  
+  .user-card .role-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+  }
+  
+  .user-card .role-badge.admin {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    color: #fff;
+  }
+  
+  .user-card .role-badge.user {
+    background: #e0e7ff;
+    color: #6366f1;
+  }
+  
+  .user-card .role-badge.none {
+    background: #f3f4f6;
+    color: #9ca3af;
+  }
+  
+  .user-card .user-id {
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 15px;
+  }
+  
+  .user-card .card-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  
+  .user-card .card-actions .layui-btn {
+    border-radius: 6px;
+    flex: 1;
+  }
+
+  /* 弹窗样式 */
+  .modal-form {
+    padding: 25px;
+  }
+  
+  .modal-form .layui-form-label {
+    width: 80px;
+  }
+  
+  .modal-form .layui-input-block {
+    margin-left: 110px;
+  }
+  
+  .modal-form .layui-input,
+  .modal-form select {
+    border-radius: 6px;
+  }
+  
+  .form-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6366f1;
+    margin-bottom: 20px;
+    padding-left: 10px;
+    border-left: 3px solid #6366f1;
+  }
+
+  /* 空状态 */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+  }
+  
+  .empty-state i {
+    font-size: 60px;
+    color: #e0e0e0;
+    margin-bottom: 15px;
+  }
+
+  /* 响应式 */
+  @media screen and (max-width: 768px) {
+    .page-header {
+      flex-direction: column;
+      text-align: center;
+      gap: 15px;
+    }
+    .stat-cards {
+      flex-direction: column;
+    }
+    .user-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="users-container">
+  
+  <!-- 顶部区域 -->
+  <div class="page-header">
+    <div class="header-info">
+      <h2><i class="layui-icon layui-icon-user"></i> 用户管理</h2>
+      <p>管理系统用户账号和权限分配</p>
+    </div>
+    <div class="header-action">
+      <button class="layui-btn" id="btn-add-user">
+        <i class="layui-icon layui-icon-add-1"></i> 新增用户
+      </button>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stat-cards">
+    <div class="stat-card">
+      <div class="icon-wrap purple">
+        <i class="layui-icon layui-icon-user"></i>
+      </div>
+      <div class="stat-info">
+        <div class="num">{{ users|length }}</div>
+        <div class="label">用户总数</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="icon-wrap blue">
+        <i class="layui-icon layui-icon-auz"></i>
+      </div>
+      <div class="stat-info">
+        <div class="num">{{ users|selectattr('role')|selectattr('role.name', 'equalto', 'Admin')|list|length }}</div>
+        <div class="label">管理员</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="icon-wrap green">
+        <i class="layui-icon layui-icon-group"></i>
+      </div>
+      <div class="stat-info">
+        <div class="num">{{ roles|length }}</div>
+        <div class="label">角色数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户列表 -->
+  <div class="user-list-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <i class="layui-icon layui-icon-friends"></i> 用户列表
+      </div>
+    </div>
+    
+    <div class="user-grid">
+      {% if users %}
+        {% for user in users %}
+        <div class="user-card">
+          <div class="user-avatar">{{ user.username[0]|upper }}</div>
+          <div class="user-name">{{ user.username }}</div>
+          <div class="user-role">
+            {% if user.role %}
+              {% if user.role.name == 'Admin' %}
+                <span class="role-badge admin">{{ user.role.name }}</span>
+              {% else %}
+                <span class="role-badge user">{{ user.role.name }}</span>
+              {% endif %}
+            {% else %}
+              <span class="role-badge none">无角色</span>
+            {% endif %}
+          </div>
+          <div class="user-id">ID: {{ user.id }}</div>
+          <div class="card-actions">
+            <button class="layui-btn layui-btn-sm layui-btn-normal btn-edit" 
+                data-id="{{ user.id }}" 
+                data-username="{{ user.username }}" 
+                data-role="{{ user.role_id }}">
+              <i class="layui-icon layui-icon-edit"></i> 编辑
+            </button>
+            <button class="layui-btn layui-btn-sm layui-btn-danger btn-delete" 
+                data-id="{{ user.id }}">
+              <i class="layui-icon layui-icon-delete"></i> 删除
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          <i class="layui-icon layui-icon-face-surprised"></i>
+          <p>暂无用户数据</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑用户弹窗 -->
+<div id="user-modal" style="display:none;">
+  <div class="modal-form">
+    <form class="layui-form" lay-filter="user-form">
+      <input type="hidden" name="id" value="">
+      
+      <div class="form-section-title">
+        <i class="layui-icon layui-icon-username"></i> 账号信息
+      </div>
+      
+      <div class="layui-form-item">
+        <label class="layui-form-label">用户名</label>
+        <div class="layui-input-block">
+          <input type="text" name="username" required lay-verify="required" placeholder="请输入用户名" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">密码</label>
+        <div class="layui-input-block">
+          <input type="password" name="password" placeholder="留空则不修改密码" autocomplete="new-password" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">角色</label>
+        <div class="layui-input-block">
+          <select name="role_id" lay-filter="role-select">
+            {% for role in roles %}
+            <option value="{{ role.id }}">{{ role.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      
+      <div class="layui-form-item" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: right;">
+        <button class="layui-btn" lay-submit lay-filter="save-user" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 6px;">
+          <i class="layui-icon layui-icon-ok"></i> 保存
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer', 'form'], function(){
+    var layer = layui.layer;
+    var form = layui.form;
+    var $ = layui.$;
+    
+    // 渲染表单
+    form.render();
+    
+    // 新增用户
+    $('#btn-add-user').click(function(){
+        form.val('user-form', {
+            id: '',
+            username: '',
+            password: '',
+            role_id: '' 
+        });
+        
+        layer.open({
+            type: 1,
+            title: '<i class="layui-icon layui-icon-add-1" style="color: #6366f1;"></i> 新增用户',
+            content: $('#user-modal'),
+            area: ['480px', '380px']
+        });
+    });
+
+    // 编辑用户
+    $('.btn-edit').click(function(){
+        var id = $(this).data('id');
+        var username = $(this).data('username');
+        var role = $(this).data('role');
+        
+        form.val('user-form', {
+            id: id,
+            username: username,
+            password: '',
+            role_id: role
+        });
+        
+        layer.open({
+            type: 1,
+            title: '<i class="layui-icon layui-icon-edit" style="color: #6366f1;"></i> 编辑用户',
+            content: $('#user-modal'),
+            area: ['480px', '380px']
+        });
+    });
+
+    // 删除用户
+    $('.btn-delete').click(function(){
+        var id = $(this).data('id');
+        var card = $(this).closest('.user-card');
+        var username = card.find('.user-name').text();
+        
+        layer.confirm('确定删除用户 <b style="color:#6366f1;">' + username + '</b> 吗？', {
+            icon: 3,
+            title: '删除确认'
+        }, function(index){
+            $.ajax({
+                url: '/admin/api/users/delete',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({id: id}),
+                success: function(res){
+                    if(res.code === 0){
+                        layer.msg('删除成功', {icon: 1}, function(){
+                            location.reload();
+                        });
+                    } else {
+                        layer.msg(res.msg, {icon: 2});
+                    }
+                }
+            });
+            layer.close(index);
+        });
+    });
+    
+    // 提交表单
+    form.on('submit(save-user)', function(data){
+        var field = data.field;
+        var loadIdx = layer.load(2);
+        
+        var url = field.id ? '/admin/api/users/update' : '/admin/api/users/add';
+        
+        $.ajax({
+            url: url,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(field),
+            success: function(res){
+                layer.close(loadIdx);
+                if(res.code === 0){
+                    layer.msg('保存成功', {icon: 1}, function(){
+                        location.reload();
+                    });
+                } else {
+                    layer.msg(res.msg, {icon: 2});
+                }
+            },
+            error: function(){
+                layer.close(loadIdx);
+                layer.msg('请求失败', {icon: 2});
+            }
+        });
+        return false;
+    });
+});
+</script>
+{% endblock %}

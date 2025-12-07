@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">后台管理控制台</div>
+            <div class="layui-card-body">
+                <div class="layui-row layui-col-space15">
+                    <div class="layui-col-md4">
+                        <div class="layui-panel" style="padding: 20px; text-align: center;">
+                            <h3><i class="layui-icon layui-icon-user"></i> 用户管理</h3>
+                            <p>管理系统用户及权限</p>
+                            <a href="{{ url_for('admin.users') }}" class="layui-btn layui-btn-sm layui-btn-normal" style="margin-top: 10px;">进入管理</a>
+                        </div>
+                    </div>
+                    <div class="layui-col-md4">
+                        <div class="layui-panel" style="padding: 20px; text-align: center;">
+                            <h3><i class="layui-icon layui-icon-set"></i> 系统设置</h3>
+                            <p>配置系统名称与LOGO</p>
+                            <a href="{{ url_for('admin.settings') }}" class="layui-btn layui-btn-sm layui-btn-warm" style="margin-top: 10px;">进入设置</a>
+                        </div>
+                    </div>
+                    <div class="layui-col-md4">
+                        <div class="layui-panel" style="padding: 20px; text-align: center;">
+                            <h3><i class="layui-icon layui-icon-chart"></i> 数据报表</h3>
+                            <p>查看最新的舆情分析报告</p>
+                            <button class="layui-btn layui-btn-sm" style="margin-top: 10px;">查看报告</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

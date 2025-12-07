@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">
+    <span class="layui-breadcrumb">
+      <a href="/">首页</a>
+      <a><cite>菜单管理</cite></a>
+    </span>
+  </div>
+  <div class="layui-card-body">
+    <div style="padding-bottom: 10px;">
+      <button class="layui-btn layui-btn-normal" id="btn-add">
+        <i class="layui-icon layui-icon-add-1"></i> 新增菜单
+      </button>
+      <span style="margin-left: 10px; color: #999; font-size: 12px;">注：修改菜单后刷新页面即可看到侧边栏变化</span>
+    </div>
+    
+    <table id="menu-table" lay-filter="menu-table"></table>
+    
+    <script type="text/html" id="tool-bar">
+      <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+      <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+  </div>
+</div>
+
+<!-- Add/Edit Modal Form -->
+<div id="modal-form" style="display:none; padding: 20px;">
+  <form class="layui-form" lay-filter="form-menu" style="padding-right: 20px;">
+    <input type="hidden" name="id" value="">
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">上级菜单</label>
+      <div class="layui-input-block">
+        <select name="parentId" id="select-parent">
+          <option value="-1">顶级菜单</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">菜单名称</label>
+      <div class="layui-input-block">
+        <input type="text" name="name" required lay-verify="required" placeholder="请输入菜单名称" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">图标</label>
+      <div class="layui-input-block">
+        <input type="text" name="icon" placeholder="layui-icon-xxx" autocomplete="off" class="layui-input">
+        <div style="margin-top:5px; color:#999; font-size:12px;">参考 Layui 图标文档</div>
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">路由/URL</label>
+      <div class="layui-input-block">
+        <input type="text" name="url" placeholder="如: admin.users" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">排序</label>
+      <div class="layui-input-block">
+        <input type="number" name="order" value="0" class="layui-input">
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">权限标识</label>
+      <div class="layui-input-block">
+        <select name="permission">
+            <option value="">所有用户</option>
+            <option value="Admin">仅管理员</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="layui-form-item">
+      <label class="layui-form-label">可见性</label>
+      <div class="layui-input-block">
+        <input type="checkbox" name="is_visible" lay-skin="switch" lay-text="显示|隐藏" checked value="1">
+      </div>
+    </div>
+    
+    <div class="layui-form-item" style="text-align: right;">
+      <button class="layui-btn" lay-submit lay-filter="save">保存</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['table', 'layer', 'form'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var form = layui.form;
+  var $ = layui.$;
+  
+  var menuList = [];
+
+  // Render Table
+  var tableIns = table.render({
+    elem: '#menu-table',
+    url: '/admin/api/menus/list',
+    cols: [[
+      {field: 'id', title: 'ID', width: 60},
+      {field: 'name', title: '名称', templet: function(d){
+          if(d.parentId != -1){
+              return '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|-- ' + d.name;
+          }
+          return '<b>'+d.name+'</b>';
+      }},
+      {field: 'icon', title: '图标', width: 150, templet: function(d){
+          return '<i class="layui-icon '+d.icon+'"></i> ' + (d.icon||'');
+      }},
+      {field: 'url', title: '路由/URL'},
+      {field: 'permission', title: '权限', width: 100},
+      {field: 'order', title: '排序', width: 80},
+      {field: 'is_visible', title: '可见', width: 80, templet: function(d){
+          return d.is_visible ? '<span class="layui-badge layui-bg-green">显示</span>' : '<span class="layui-badge layui-bg-gray">隐藏</span>';
+      }},
+      {title: '操作', toolbar: '#tool-bar', width: 150}
+    ]],
+    limit: 100, // Show all
+    done: function(res){
+        menuList = res.data;
+    }
+  });
+  
+  // Helper: Refresh Parent Options
+  function refreshParents(selectedId){
+      var html = '<option value="-1">顶级菜单</option>';
+      menuList.forEach(function(m){
+          if(m.parentId === -1){ // Only allow root as parent
+              html += '<option value="'+m.id+'">'+m.name+'</option>';
+          }
+      });
+      $('#select-parent').html(html);
+      if(selectedId) $('#select-parent').val(selectedId);
+      form.render('select');
+  }
+
+  // Add Button
+  $('#btn-add').click(function(){
+      form.val('form-menu', {
+          id: '', parentId: -1, name: '', icon: '', url: '', order: 0, permission: '', is_visible: true
+      });
+      refreshParents();
+      
+      layer.open({
+          type: 1,
+          title: '新增菜单',
+          content: $('#modal-form'),
+          area: ['500px', '550px']
+      });
+  });
+  
+  // Tool Event
+  table.on('tool(menu-table)', function(obj){
+      var data = obj.data;
+      if(obj.event === 'del'){
+          layer.confirm('确定删除该菜单吗？', function(index){
+              $.ajax({
+                  url: '/admin/api/menus/delete',
+                  type: 'POST',
+                  contentType: 'application/json',
+                  data: JSON.stringify({id: data.id}),
+                  success: function(res){
+                      if(res.code === 0){
+                          layer.msg('删除成功');
+                          tableIns.reload();
+                      } else {
+                          layer.msg(res.msg, {icon: 2});
+                      }
+                  }
+              });
+              layer.close(index);
+          });
+      } else if(obj.event === 'edit'){
+          refreshParents(data.parentId);
+          form.val('form-menu', {
+              id: data.id,
+              parentId: data.parentId,
+              name: data.name,
+              icon: data.icon,
+              url: data.url,
+              order: data.order,
+              permission: data.permission,
+              is_visible: data.is_visible
+          });
+          
+          layer.open({
+              type: 1,
+              title: '编辑菜单',
+              content: $('#modal-form'),
+              area: ['500px', '550px']
+          });
+      }
+  });
+  
+  // Submit Form
+  form.on('submit(save)', function(data){
+      var field = data.field;
+      // Handle switch
+      field.is_visible = (field.is_visible === '1');
+      
+      var url = field.id ? '/admin/api/menus/update' : '/admin/api/menus/add';
+      
+      $.ajax({
+          url: url,
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(field),
+          success: function(res){
+              if(res.code === 0){
+                  layer.msg(res.msg, {icon: 1});
+                  layer.closeAll('page');
+                  tableIns.reload();
+              } else {
+                  layer.msg(res.msg, {icon: 2});
+              }
+          }
+      });
+      return false; 
+  });
+
+});
+</script>
+{% endblock %}

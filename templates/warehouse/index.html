@@ -1,0 +1,1096 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* 数据仓库模块样式 */
+  .warehouse-container {
+    padding: 0;
+  }
+  
+  /* 顶部统计卡片区 */
+  .stat-cards {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .stat-card {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    padding: 20px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stat-card.card-blue {
+    background: linear-gradient(135deg, #1e9fff 0%, #0066cc 100%);
+  }
+  
+  .stat-card.card-green {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  }
+  
+  .stat-card.card-orange {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: -20px;
+    width: 100px;
+    height: 100px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  
+  .stat-card .stat-icon {
+    font-size: 36px;
+    opacity: 0.8;
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  
+  .stat-card .stat-num {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  
+  .stat-card .stat-label {
+    font-size: 14px;
+    opacity: 0.9;
+  }
+
+  /* 主内容区 */
+  .main-panel {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  
+  .panel-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+  }
+  
+  .panel-title i {
+    margin-right: 10px;
+    color: #1e9fff;
+  }
+
+  /* 搜索区域 */
+  .search-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .search-area .layui-input {
+    width: 280px;
+    border-radius: 20px;
+    padding-left: 15px;
+  }
+  
+  .search-area .search-btn {
+    border-radius: 20px;
+    padding: 0 20px;
+  }
+
+  /* 工具栏 */
+  .toolbar-area {
+    padding: 15px 25px;
+    background: #fafbfc;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .toolbar-area .layui-btn {
+    border-radius: 6px;
+    transition: all 0.3s;
+  }
+  
+  .toolbar-area .layui-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  /* 表格区域 */
+  .table-area {
+    padding: 20px 25px;
+  }
+  
+  /* 表格样式优化 */
+  .layui-table-cell {
+    height: 44px !important;
+    line-height: 44px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 12px;
+  }
+  
+  .layui-table-cell .layui-form-checkbox {
+    top: 0px;
+  }
+  
+  .layui-table th {
+    background: #f8f9fa !important;
+    font-weight: 600;
+  }
+  
+  .layui-table tr:hover {
+    background: #f5f9ff !important;
+  }
+  
+  .layui-badge {
+    margin-top: 4px;
+    display: inline-block;
+    border-radius: 4px;
+  }
+
+  /* 弹窗样式优化 */
+  .modal-content {
+    padding: 25px;
+  }
+  
+  .modal-section {
+    margin-bottom: 20px;
+  }
+  
+  .modal-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+    padding-left: 10px;
+    border-left: 3px solid #1e9fff;
+  }
+
+  /* 来源管理弹窗 */
+  .source-manager {
+    background: #f5f7fa;
+    border-radius: 8px;
+  }
+  
+  .source-list-panel {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .source-list-header {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .source-list-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+  
+  .source-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+  }
+  
+  .source-item:hover {
+    background: #f0f9ff;
+  }
+  
+  .source-item.selected {
+    background: #e6f7ff;
+    border-left: 3px solid #1e9fff;
+  }
+  
+  .source-item .check-icon {
+    width: 24px;
+    font-size: 18px;
+    color: #ddd;
+    margin-right: 10px;
+  }
+  
+  .source-item.selected .check-icon {
+    color: #1e9fff;
+  }
+
+  /* 响应式 */
+  @media screen and (max-width: 992px) {
+    .stat-cards {
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      min-width: calc(50% - 10px);
+    }
+    .panel-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .search-area .layui-input {
+      width: 200px;
+    }
+  }
+</style>
+
+<div class="warehouse-container">
+  
+  <!-- 统计卡片 -->
+  <div class="stat-cards">
+    <div class="stat-card card-blue">
+      <div class="stat-num" id="stat-total">--</div>
+      <div class="stat-label">数据总量</div>
+      <i class="layui-icon layui-icon-file stat-icon"></i>
+    </div>
+    <div class="stat-card card-green">
+      <div class="stat-num" id="stat-crawled">--</div>
+      <div class="stat-label">已深采</div>
+      <i class="layui-icon layui-icon-ok-circle stat-icon"></i>
+    </div>
+    <div class="stat-card card-orange">
+      <div class="stat-num" id="stat-sources">--</div>
+      <div class="stat-label">来源数</div>
+      <i class="layui-icon layui-icon-website stat-icon"></i>
+    </div>
+  </div>
+
+  <!-- 主面板 -->
+  <div class="main-panel">
+    
+    <!-- 面板头部 -->
+    <div class="panel-header">
+      <div class="panel-title">
+        <i class="layui-icon layui-icon-template-1"></i>
+        数据仓库
+      </div>
+      <div class="search-area">
+        <input type="text" id="search-keyword" placeholder="搜索标题或关键词..." class="layui-input">
+        <button class="layui-btn layui-btn-normal search-btn" id="do-search">
+          <i class="layui-icon layui-icon-search"></i> 搜索
+        </button>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    {% if current_user.is_admin() %}
+    <div class="toolbar-area">
+      <button class="layui-btn layui-btn-warm" id="manage-sources">
+        <i class="layui-icon layui-icon-set"></i> 来源规则管理
+      </button>
+      <button class="layui-btn" id="smart-sniff" style="background-color: #1E9FFF;">
+        <i class="layui-icon layui-icon-find-fill"></i> 智能嗅探
+      </button>
+      <button class="layui-btn" id="batch-auto-rules" style="background-color: #009688;">
+        <i class="layui-icon layui-icon-magic"></i> 批量生成规则
+      </button>
+      <button class="layui-btn" id="auto-bind-rules" style="background-color: #5FB878;">
+        <i class="layui-icon layui-icon-link"></i> 一键自动关联
+      </button>
+      <button class="layui-btn layui-btn-normal" id="batch-crawl">
+        <i class="layui-icon layui-icon-engine"></i> 深度采集
+      </button>
+      <button class="layui-btn layui-btn-danger" id="batch-delete">
+        <i class="layui-icon layui-icon-delete"></i> 批量删除
+      </button>
+    </div>
+    {% endif %}
+
+    <!-- 表格区域 -->
+    <div class="table-area">
+      <table id="data-table" lay-filter="data-table"></table>
+    </div>
+    
+  </div>
+</div>
+
+<!-- Action Bar Template -->
+<script type="text/html" id="table-bar">
+  <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="preview"><i class="layui-icon layui-icon-read"></i> 预览</a>
+  {% if current_user.is_admin() %}
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="crawl"><i class="layui-icon layui-icon-engine"></i> 采集</a>
+  <a class="layui-btn layui-btn-xs" lay-event="sniff" style="background:#009688;"><i class="layui-icon layui-icon-find-fill"></i> 嗅探</a>
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></a>
+  <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del"><i class="layui-icon layui-icon-delete"></i></a>
+  {% endif %}
+</script>
+
+<!-- Preview Modal Template -->
+<div id="preview-modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-section">
+      <h3 id="preview-title" style="font-size: 20px; font-weight: 600; color: #333; line-height: 1.5; margin-bottom: 15px;"></h3>
+      <div style="color: #999; font-size: 13px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed #eee;">
+        <span><i class="layui-icon layui-icon-website"></i> 来源：<span id="preview-source"></span></span>
+        <span style="margin-left: 20px;"><i class="layui-icon layui-icon-link"></i> <a id="preview-url" href="#" target="_blank" style="color: #1E9FFF;">查看原文</a></span>
+      </div>
+      <div id="preview-content" style="white-space: pre-wrap; line-height: 1.9; font-size: 15px; color: #444; text-align: justify;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal Template -->
+<div id="edit-modal" style="display: none;">
+  <div class="modal-content">
+    <form class="layui-form" lay-filter="edit-form">
+      <input type="hidden" name="id">
+      <div class="layui-form-item">
+        <label class="layui-form-label">标题</label>
+        <div class="layui-input-block">
+          <input type="text" name="title" required lay-verify="required" placeholder="请输入标题" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item layui-form-text">
+        <label class="layui-form-label">摘要</label>
+        <div class="layui-input-block">
+          <textarea name="deep_summary" placeholder="请输入内容" class="layui-textarea" rows="10"></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item" style="text-align: right;">
+        <button class="layui-btn layui-btn-normal" lay-submit lay-filter="save-edit">
+          <i class="layui-icon layui-icon-ok"></i> 保存修改
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Source Manager Modal -->
+<div id="source-modal" style="display: none;">
+  <div class="modal-content source-manager">
+    <div class="layui-row layui-col-space15">
+      <div class="layui-col-md5">
+        <div class="source-list-panel">
+          <div class="source-list-header">
+            <span><i class="layui-icon layui-icon-website"></i> 来源列表</span>
+            <button class="layui-btn layui-btn-xs layui-btn-primary" id="select-all-sources">全选/取消</button>
+          </div>
+          <div style="padding: 10px; border-bottom: 1px solid #f0f0f0;">
+            <div class="layui-input-inline" style="width: calc(100% - 70px);">
+              <input type="text" id="source-search-keyword" placeholder="搜索来源或域名" class="layui-input" style="height: 32px;">
+            </div>
+            <button class="layui-btn layui-btn-sm layui-btn-normal" id="source-search-btn">搜索</button>
+          </div>
+          <div class="source-list-body" id="source-list">
+            <!-- Sources will be loaded here -->
+          </div>
+        </div>
+      </div>
+      <div class="layui-col-md7">
+        <div class="source-list-panel">
+          <div class="source-list-header">
+            <span><i class="layui-icon layui-icon-link"></i> 绑定规则</span>
+            <span id="current-source" style="color: #1e9fff; font-weight: normal; font-size: 13px;"></span>
+          </div>
+          <div class="source-list-body" style="padding: 15px;">
+            <form class="layui-form" id="rule-bind-form" lay-filter="rule-bind-form">
+              <div id="rule-list">
+                <div style="color: #999; padding: 40px; text-align: center;">
+                  <i class="layui-icon layui-icon-tips" style="font-size: 40px; color: #ddd;"></i>
+                  <p style="margin-top: 10px;">请先选择左侧来源</p>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div style="padding: 15px; border-top: 1px solid #f0f0f0; text-align: right; display: none;" id="bind-btn-area">
+            <button class="layui-btn layui-btn-normal" type="button" id="save-binding">
+              <i class="layui-icon layui-icon-ok"></i> 保存绑定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Smart Sniff Modal -->
+<div id="sniff-modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-section">
+      <div class="modal-section-title">目标分析</div>
+      <div class="layui-form">
+        <div class="layui-form-item">
+          <label class="layui-form-label">目标URL</label>
+          <div class="layui-input-block">
+            <input type="text" id="sniff-url" placeholder="请输入需要分析的目标详情页URL" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <div class="layui-input-block">
+            <button class="layui-btn layui-btn-normal" type="button" id="do-sniff">
+              <i class="layui-icon layui-icon-find-fill"></i> 开始分析
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-section">
+      <div class="modal-section-title">分析结果</div>
+      <div class="layui-form" lay-filter="sniff-result-form">
+        <input type="hidden" name="headers_json" id="sniff-headers-json">
+        <div class="layui-form-item">
+          <label class="layui-form-label">站点名称</label>
+          <div class="layui-input-block">
+            <input type="text" name="site_name" class="layui-input" placeholder="自动获取或手动输入">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">站点域名</label>
+          <div class="layui-input-block">
+            <input type="text" name="domain" class="layui-input" placeholder="自动获取">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">标题XPath</label>
+          <div class="layui-input-block">
+            <input type="text" name="title_xpath" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">内容XPath</label>
+          <div class="layui-input-block">
+            <input type="text" name="content_xpath" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <div class="layui-input-block">
+            <button class="layui-btn" type="button" id="save-sniffed-rule" style="background: #009688;">
+              <i class="layui-icon layui-icon-release"></i> 保存为新规则
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['table', 'form', 'layer'], function(){
+  var table = layui.table;
+  var form = layui.form;
+  var layer = layui.layer;
+  var $ = layui.$;
+
+  // 加载统计数据
+  function loadStats(){
+    $.get('/warehouse/api/stats', function(res){
+      if(res.code === 0){
+        $('#stat-total').text(res.data.total || 0);
+        $('#stat-crawled').text(res.data.crawled || 0);
+        $('#stat-sources').text(res.data.sources || 0);
+      }
+    });
+  }
+  loadStats();
+
+  // Render Table
+  var tableIns = table.render({
+    elem: '#data-table',
+    url: '/warehouse/api/list',
+    page: true,
+    limit: 15,
+    cols: [[
+      {type: 'checkbox', fixed: 'left'},
+      {field: 'id', title: 'ID', width: 70, sort: true},
+      {field: 'title', title: '标题', minWidth: 300, templet: function(d){
+        return '<a href="'+(d.url||'#')+'" target="_blank" class="layui-table-link" title="'+d.title+'">'+d.title+'</a>';
+      }},
+      {field: 'source', title: '来源 | 域名 | 规则', width: 280, templet: function(d){
+          var html = '<span style="font-weight: 500;">' + d.source + '</span>';
+          if(d.domain){
+              html += '<span style="color:#999; margin-left:5px;">| ' + d.domain + '</span>';
+          }
+          if(d.bound_rules && d.bound_rules.length > 0){
+              html += '<br><span class="layui-badge layui-bg-orange" style="font-size:11px;" title="已关联规则: '+d.bound_rules.join(', ')+'">'+d.bound_rules.join(', ')+'</span>';
+          }
+          return html;
+      }},
+      {field: 'deep_crawled', title: '深采', width: 70, align: 'center', templet: function(d){
+        return d.deep_crawled ? '<span class="layui-badge layui-bg-green">是</span>' : '<span class="layui-badge layui-bg-gray">否</span>';
+      }},
+      {field: 'created_at', title: '采集时间', width: 170, sort: true},
+      {fixed: 'right', title:'操作', toolbar: '#table-bar', width: 260}
+    ]],
+    done: function(){
+      loadStats();
+    }
+  });
+
+  // Search
+  $('#do-search').on('click', function(){
+    var keyword = $('#search-keyword').val();
+    tableIns.reload({
+      where: {keyword: keyword},
+      page: {curr: 1}
+    });
+  });
+  
+  $('#search-keyword').on('keyup', function(e){
+    if(e.keyCode === 13) $('#do-search').click();
+  });
+
+  // Batch Delete
+  $('#batch-delete').on('click', function(){
+    var checkStatus = table.checkStatus('data-table');
+    var data = checkStatus.data;
+    if(data.length === 0){
+      layer.msg('请选择要删除的数据', {icon: 0});
+      return;
+    }
+    var ids = data.map(function(item){return item.id;});
+    
+    layer.confirm('确认删除选中的 <b style="color:#FF5722;">' + data.length + '</b> 条数据吗？', {icon: 3, title: '删除确认'}, function(index){
+      $.ajax({
+        url: '/warehouse/api/delete',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: ids}),
+        success: function(res){
+          if(res.code === 0){
+            layer.msg('删除成功', {icon: 1});
+            tableIns.reload();
+          } else {
+            layer.msg(res.msg || '删除失败', {icon: 2});
+          }
+        }
+      });
+      layer.close(index);
+    });
+  });
+
+  // Smart Sniff
+  $('#smart-sniff').on('click', function(){
+    layer.open({
+      type: 1,
+      title: '<i class="layui-icon layui-icon-find-fill"></i> 智能采集规则嗅探',
+      area: ['650px', '580px'],
+      content: $('#sniff-modal'),
+      success: function(){
+        $('#sniff-url').val('');
+        form.val('sniff-result-form', {
+            'site_name': '',
+            'domain': '',
+            'title_xpath': '',
+            'content_xpath': ''
+        });
+      }
+    });
+  });
+  
+  $('#do-sniff').on('click', function(){
+      var url = $('#sniff-url').val();
+      if(!url){
+          layer.msg('请输入URL', {icon: 0});
+          return;
+      }
+      
+      var loadIndex = layer.load(2);
+      $.ajax({
+          url: '/warehouse/api/smart_sniff',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({url: url}),
+          success: function(res){
+              layer.close(loadIndex);
+              if(res.code === 0){
+                  layer.msg('分析成功', {icon: 1});
+                  
+                  var headers = res.data.headers || {};
+                  $('#sniff-headers-json').val(JSON.stringify(headers));
+                  
+                  form.val('sniff-result-form', {
+                      'site_name': res.data.site_name || '',
+                      'domain': res.data.domain || '',
+                      'title_xpath': res.data.title_xpath || '未找到',
+                      'content_xpath': res.data.content_xpath || '未找到'
+                  });
+              } else {
+                  layer.msg(res.msg || '分析失败', {icon: 2});
+              }
+          },
+          error: function(){
+              layer.close(loadIndex);
+              layer.msg('请求失败', {icon: 2});
+          }
+      });
+  });
+
+  // Save Sniffed Rule
+  $('#save-sniffed-rule').on('click', function(){
+      var data = form.val('sniff-result-form');
+      if(!data.site_name){
+          layer.msg('请输入站点名称', {icon: 0});
+          return;
+      }
+      if(!data.title_xpath || !data.content_xpath){
+          layer.msg('XPath信息不完整', {icon: 0});
+          return;
+      }
+      
+      var payload = {
+          site_name: data.site_name,
+          domain: data.domain,
+          title_xpath: data.title_xpath,
+          content_xpath: data.content_xpath,
+          headers: $('#sniff-headers-json').val()
+      };
+      
+      var loading = layer.load(1);
+      $.ajax({
+          url: '/rules/api/add',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(payload),
+          success: function(res){
+              layer.close(loading);
+              if(res.code === 0){
+                  layer.msg('规则已保存', {icon: 1});
+                  layer.closeAll('page');
+              } else {
+                  layer.msg('保存失败: ' + res.msg, {icon: 2});
+              }
+          },
+          error: function(){
+              layer.close(loading);
+              layer.msg('请求失败', {icon: 2});
+          }
+      });
+  });
+
+  // Batch Deep Crawl
+  $('#batch-crawl').on('click', function(){
+    var checkStatus = table.checkStatus('data-table');
+    var data = checkStatus.data;
+    if(data.length === 0){
+      layer.msg('请选择要采集的数据', {icon: 0});
+      return;
+    }
+    var ids = data.map(function(item){return item.id;});
+    
+    var loading = layer.load(1);
+    $.ajax({
+      url: '/warehouse/api/deep_crawl',
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ids: ids}),
+      success: function(res){
+        layer.close(loading);
+        if(res.code === 0){
+          layer.msg(res.msg, {icon: 1});
+          tableIns.reload();
+        } else {
+          layer.alert(res.msg + (res.errors ? '<br>' + res.errors.join('<br>') : ''), {icon: 2, title: '采集失败'});
+        }
+      },
+      error: function(){
+        layer.close(loading);
+        layer.msg('请求失败', {icon: 2});
+      }
+    });
+  });
+
+  // Auto Bind Rules
+  $('#auto-bind-rules').on('click', function(){
+    layer.confirm('将自动检测来源与规则的匹配性（域名+名称），并自动建立关联。<br>确定要继续吗？', {icon: 3, title: '自动关联'}, function(index){
+      var loading = layer.load(1);
+      $.ajax({
+        url: '/warehouse/api/auto_bind',
+        type: 'POST',
+        success: function(res){
+          layer.close(loading);
+          if(res.code === 0){
+            layer.msg(res.msg, {icon: 1});
+            tableIns.reload();
+          } else {
+            layer.msg('操作失败: ' + res.msg, {icon: 2});
+          }
+        },
+        error: function(){
+          layer.close(loading);
+          layer.msg('请求失败', {icon: 2});
+        }
+      });
+      layer.close(index);
+    });
+  });
+
+  // Batch Auto Generate Rules
+  $('#batch-auto-rules').on('click', function(){
+    var checkStatus = table.checkStatus('data-table');
+    var data = checkStatus.data;
+    if(data.length === 0){
+      layer.msg('请选择数据', {icon: 0});
+      return;
+    }
+    var ids = data.map(function(item){return item.id;});
+    
+    layer.confirm('将对选中的 <b>' + data.length + '</b> 条数据进行智能嗅探，并自动生成采集规则入库。<br>已存在的域名将自动跳过。<br>确定要继续吗？', {icon: 3, title: '批量生成规则'}, function(index){
+      var loading = layer.load(1);
+      $.ajax({
+        url: '/warehouse/api/batch_generate_rules',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: ids}),
+        success: function(res){
+            layer.close(loading);
+            if(res.code === 0){
+                layer.alert(res.msg, {icon: 1});
+            } else {
+                layer.alert(res.msg, {icon: 2});
+            }
+        },
+        error: function(){
+            layer.close(loading);
+            layer.msg('请求失败', {icon: 2});
+        }
+      });
+      layer.close(index);
+    });
+  });
+
+  // Manage Sources
+  $('#manage-sources').on('click', function(){
+    layer.open({
+      type: 1,
+      title: '<i class="layui-icon layui-icon-set"></i> 来源规则管理',
+      area: ['950px', '600px'],
+      content: $('#source-modal'),
+      success: function(){
+        loadSources();
+        loadRules();
+      }
+    });
+  });
+  
+  // Source Search
+  $('#source-search-btn').on('click', function(){
+      loadSources($('#source-search-keyword').val());
+  });
+  $('#source-search-keyword').on('keyup', function(e){
+      if(e.keyCode === 13){
+          loadSources($(this).val());
+      }
+  });
+  
+  var allRules = [];
+  
+  function loadSources(keyword){
+    var loadIndex = layer.load(2, {shade: 0.1});
+    $.get('/warehouse/api/sources?keyword=' + (keyword || ''), function(res){
+      layer.close(loadIndex);
+      if(res.code === 0){
+        var html = '';
+        if(res.data.length === 0){
+            html = '<div style="padding:40px; text-align:center; color:#999;"><i class="layui-icon layui-icon-face-surprised" style="font-size:40px;"></i><p>无匹配来源</p></div>';
+        }
+        res.data.forEach(function(item){
+          var safeSrc = item.source.replace(/'/g, "&#39;");
+          var domain = item.domain || '';
+          var boundCount = item.bound_count || 0;
+          
+          html += '<div class="source-item" data-source="'+safeSrc+'" data-domain="'+domain+'" data-bound-count="'+boundCount+'">';
+          html += '<i class="layui-icon layui-icon-circle check-icon"></i>';
+          html += '<div style="flex: 1;">';
+          html += '<div style="font-weight: 500;">' + item.source;
+          if(boundCount > 0){
+             html += ' <span class="layui-badge layui-bg-green" style="margin-left: 5px; font-size: 11px;">'+boundCount+'</span>';
+          }
+          html += '</div>';
+          if(domain){
+             html += '<div style="color:#999; font-size:12px; margin-top:2px;">' + domain + '</div>';
+          }
+          html += '</div></div>';
+        });
+        $('#source-list').html(html);
+        
+        // Handle click selection
+        $('#source-list .source-item').on('click', function(){
+            $(this).toggleClass('selected');
+            var icon = $(this).find('.check-icon');
+            if($(this).hasClass('selected')){
+                icon.removeClass('layui-icon-circle').addClass('layui-icon-ok-circle');
+            } else {
+                icon.removeClass('layui-icon-ok-circle').addClass('layui-icon-circle');
+            }
+            updateSelectionUI();
+        });
+      }
+    });
+  }
+
+  // Select All Sources Logic
+  $(document).on('click', '#select-all-sources', function(){
+      var items = $('#source-list .source-item');
+      if(items.length === 0) return;
+      
+      var selectedItems = items.filter('.selected');
+      var isAllSelected = items.length === selectedItems.length;
+      
+      if(isAllSelected){
+          items.removeClass('selected');
+          items.find('.check-icon').removeClass('layui-icon-ok-circle').addClass('layui-icon-circle');
+      } else {
+          items.addClass('selected');
+          items.find('.check-icon').removeClass('layui-icon-circle').addClass('layui-icon-ok-circle');
+      }
+      updateSelectionUI();
+  });
+  
+  function updateSelectionUI(){
+      var selected = $('#source-list .source-item.selected');
+      var count = selected.length;
+      
+      if(count === 0){
+          $('#current-source').text('');
+          $('#bind-btn-area').hide();
+          $('#rule-list').html('<div style="color: #999; padding: 40px; text-align: center;"><i class="layui-icon layui-icon-tips" style="font-size: 40px; color: #ddd;"></i><p style="margin-top: 10px;">请先选择左侧来源</p></div>');
+          return;
+      }
+      
+      if(count === 1){
+          var li = selected.first();
+          var source = li.data('source');
+          var domain = li.data('domain');
+          $('#current-source').text(source + (domain ? ' ('+domain+')' : ''));
+          $('#bind-btn-area').show();
+          
+          $.ajax({
+            url: '/warehouse/api/source_rules',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({source: source, domain: domain}),
+            success: function(res){
+                var boundIds = res.code === 0 ? res.data : [];
+                renderRules(boundIds);
+            }
+          });
+      } else {
+          $('#current-source').text('批量选择 ' + count + ' 个来源');
+          $('#bind-btn-area').show();
+          renderRules([]);
+      }
+  }
+  
+  function loadRules(){
+    $.get('/rules/api/list?limit=1000', function(res){
+      if(res.code === 0){
+        allRules = res.data;
+      }
+    });
+  }
+  
+  function renderRules(boundIds){
+      var html = '';
+      if(allRules.length === 0){
+          html = '<div style="padding: 20px; text-align: center; color: #999;">暂无规则，请先去规则库添加</div>';
+      } else {
+          html = '<div class="layui-row">';
+          allRules.forEach(function(rule){
+              var checked = boundIds.includes(rule.id) ? 'checked' : '';
+              html += '<div class="layui-col-md12" style="padding: 8px 0; border-bottom: 1px solid #f5f5f5;">';
+              html += '<input type="checkbox" name="rules[]" value="'+rule.id+'" title="'+rule.site_name+' <span style=\'color:#999;\'>'+ (rule.domain||'-') +'</span>" lay-skin="primary" '+checked+'>';
+              html += '</div>';
+          });
+          html += '</div>';
+      }
+      $('#rule-list').html(html);
+      form.render('checkbox', 'rule-bind-form');
+  }
+  
+  $('#save-binding').on('click', function(){
+      var selected = $('#source-list .source-item.selected');
+      if(selected.length === 0) return;
+      
+      var sources = [];
+      selected.each(function(){
+          sources.push({
+              source: $(this).data('source'),
+              domain: $(this).data('domain')
+          });
+      });
+      
+      var ruleIds = [];
+      $('#rule-list input[type="checkbox"]:checked').each(function(){
+          ruleIds.push(parseInt($(this).val()));
+      });
+      
+      var loading = layer.load(1);
+      $.ajax({
+          url: '/warehouse/api/bind_source',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({sources: sources, rule_ids: ruleIds}),
+          success: function(res){
+              layer.close(loading);
+              if(res.code === 0){
+                  layer.msg('绑定成功', {icon: 1});
+                  loadSources($('#source-search-keyword').val());
+                  tableIns.reload();
+              } else {
+                  layer.msg('绑定失败: ' + res.msg, {icon: 2});
+              }
+          },
+          error: function(){
+              layer.close(loading);
+              layer.msg('请求失败', {icon: 2});
+          }
+      });
+  });
+
+  // Tool Events
+  table.on('tool(data-table)', function(obj){
+    var data = obj.data;
+    var layEvent = obj.event;
+
+    if(layEvent === 'del'){
+      layer.confirm('确定删除这条数据吗？', {icon: 3, title: '删除确认'}, function(index){
+        $.ajax({
+          url: '/warehouse/api/delete',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ids: [data.id]}),
+          success: function(res){
+            if(res.code === 0){
+              obj.del();
+              layer.msg('删除成功', {icon: 1});
+            } else {
+              layer.msg('删除失败: ' + res.msg, {icon: 2});
+            }
+          }
+        });
+        layer.close(index);
+      });
+    } else if(layEvent === 'preview'){
+      if(!data.deep_crawled){
+        layer.msg('该条目尚未进行深度采集，无法预览内容', {icon: 0});
+        return;
+      }
+      
+      var loadIndex = layer.load(1);
+      $.ajax({
+        url: '/warehouse/api/detail/' + data.id,
+        type: 'GET',
+        success: function(res){
+          layer.close(loadIndex);
+          if(res.code === 0){
+            $('#preview-title').text(res.data.title || data.title);
+            $('#preview-source').text(data.source);
+            $('#preview-url').attr('href', data.url);
+            $('#preview-content').text(res.data.content || '暂无内容');
+            
+            layer.open({
+              type: 1,
+              title: '<i class="layui-icon layui-icon-read"></i> 内容预览',
+              area: ['800px', '600px'],
+              content: $('#preview-modal'),
+              shadeClose: true
+            });
+          } else {
+            layer.msg('获取详情失败: ' + res.msg, {icon: 2});
+          }
+        },
+        error: function(){
+          layer.close(loadIndex);
+          layer.msg('网络请求失败', {icon: 2});
+        }
+      });
+    } else if(layEvent === 'crawl'){
+      var loading = layer.load(1);
+      $.ajax({
+        url: '/warehouse/api/deep_crawl',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: [data.id]}),
+        success: function(res){
+          layer.close(loading);
+          if(res.code === 0){
+            layer.msg(res.msg, {icon: 1});
+            tableIns.reload();
+          } else {
+            layer.msg('采集失败: ' + res.msg, {icon: 2});
+          }
+        }
+      });
+    } else if(layEvent === 'sniff'){
+      layer.open({
+        type: 1,
+        title: '<i class="layui-icon layui-icon-find-fill"></i> 智能采集规则嗅探',
+        area: ['650px', '580px'],
+        content: $('#sniff-modal'),
+        success: function(){
+          $('#sniff-url').val(data.url);
+          form.val('sniff-result-form', {
+              'site_name': '',
+              'domain': '',
+              'title_xpath': '',
+              'content_xpath': ''
+          });
+        }
+      });
+    } else if(layEvent === 'edit'){
+      form.val('edit-form', data);
+      layer.open({
+        type: 1,
+        title: '<i class="layui-icon layui-icon-edit"></i> 编辑条目',
+        area: ['550px', '450px'],
+        content: $('#edit-modal')
+      });
+    }
+  });
+
+  // Save Edit
+  form.on('submit(save-edit)', function(data){
+    $.ajax({
+      url: '/warehouse/api/update',
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(data.field),
+      success: function(res){
+        if(res.code === 0){
+          layer.closeAll('page');
+          layer.msg('更新成功', {icon: 1});
+          tableIns.reload();
+        } else {
+          layer.msg('更新失败: ' + res.msg, {icon: 2});
+        }
+      }
+    });
+    return false;
+  });
+
+});
+</script>
+{% endblock %}

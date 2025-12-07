@@ -1,0 +1,705 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* 爬虫管理模块样式 */
+  .crawler-container {
+    padding: 0;
+  }
+  
+  /* 顶部区域 */
+  .page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 25px 30px;
+    margin-bottom: 20px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  }
+  
+  .page-header-left h2 {
+    margin: 0 0 8px 0;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  
+  .page-header-left p {
+    margin: 0;
+    opacity: 0.85;
+    font-size: 14px;
+  }
+  
+  .page-header-right .layui-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+  
+  .page-header-right .layui-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
+  }
+  
+  .page-header-right .layui-btn-danger {
+    background: rgba(255,87,87,0.8);
+    border-color: rgba(255,87,87,0.5);
+  }
+
+  /* 主内容区 */
+  .main-content {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  
+  /* 搜索栏 */
+  .search-bar {
+    padding: 20px 25px;
+    background: #fafbfc;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .search-bar .layui-input {
+    width: 320px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  
+  .search-bar .layui-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .search-bar .layui-btn {
+    border-radius: 8px;
+  }
+
+  /* 表格区域 */
+  .table-wrapper {
+    padding: 20px 25px;
+  }
+  
+  /* 表格样式优化 */
+  .layui-table-cell {
+    height: 50px !important;
+    line-height: 50px !important;
+    padding: 0 15px;
+  }
+  
+  .layui-table th {
+    background: #f8f9fa !important;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .layui-table tr:hover {
+    background: #f5f8ff !important;
+  }
+  
+  .layui-table-link {
+    color: #667eea !important;
+  }
+  
+  .layui-table-link:hover {
+    text-decoration: underline;
+  }
+
+  /* 状态徽章 */
+  .status-active {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    padding: 4px 12px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 12px;
+  }
+  
+  .status-inactive {
+    background: #e0e0e0;
+    padding: 4px 12px;
+    border-radius: 12px;
+    color: #666;
+    font-size: 12px;
+  }
+
+  /* 操作按钮 */
+  .layui-table .layui-btn-xs {
+    border-radius: 4px;
+    padding: 0 10px;
+  }
+
+  /* 弹窗样式 */
+  .modal-form {
+    padding: 25px;
+  }
+  
+  .modal-form .layui-form-label {
+    width: 90px;
+    font-weight: 500;
+  }
+  
+  .modal-form .layui-input-block {
+    margin-left: 120px;
+  }
+  
+  .modal-form .layui-input,
+  .modal-form .layui-textarea {
+    border-radius: 6px;
+  }
+  
+  .modal-form .layui-textarea {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  .form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed #eee;
+  }
+  
+  .form-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .form-section-title i {
+    margin-right: 8px;
+  }
+  
+  .form-tips {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+  }
+
+  /* 测试结果样式 */
+  .test-result-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+  }
+  
+  .test-result-item:hover {
+    background: #f8f9ff;
+  }
+  
+  .test-result-item:last-child {
+    border-bottom: none;
+  }
+  
+  .test-result-title {
+    font-weight: 500;
+    margin-bottom: 5px;
+  }
+  
+  .test-result-title a {
+    color: #333;
+    transition: color 0.2s;
+  }
+  
+  .test-result-title a:hover {
+    color: #667eea;
+  }
+  
+  .test-result-meta {
+    font-size: 12px;
+    color: #999;
+  }
+
+  /* 响应式 */
+  @media screen and (max-width: 768px) {
+    .page-header {
+      flex-direction: column;
+      text-align: center;
+      gap: 15px;
+    }
+    .search-bar {
+      flex-direction: column;
+    }
+    .search-bar .layui-input {
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="crawler-container">
+  
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="layui-icon layui-icon-engine"></i> 爬虫管理</h2>
+      <p>管理和配置数据采集源，支持自定义爬虫规则</p>
+    </div>
+    <div class="page-header-right">
+      <button class="layui-btn" id="add-btn">
+        <i class="layui-icon layui-icon-add-1"></i> 新增来源
+      </button>
+      <button class="layui-btn layui-btn-danger" id="batch-delete">
+        <i class="layui-icon layui-icon-delete"></i> 批量删除
+      </button>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="main-content">
+    
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+      <div class="layui-input-wrap">
+        <div class="layui-input-prefix">
+          <i class="layui-icon layui-icon-search" style="color: #999;"></i>
+        </div>
+        <input type="text" id="search-keyword" placeholder="搜索名称或地址关键字..." class="layui-input" style="padding-left: 35px;">
+      </div>
+      <button class="layui-btn layui-btn-normal" id="do-search">
+        <i class="layui-icon layui-icon-search"></i> 查询
+      </button>
+      <button class="layui-btn layui-btn-primary" id="refresh-btn">
+        <i class="layui-icon layui-icon-refresh-3"></i> 刷新
+      </button>
+    </div>
+
+    <!-- 表格区域 -->
+    <div class="table-wrapper">
+      <table id="data-table" lay-filter="data-table"></table>
+    </div>
+    
+  </div>
+</div>
+
+<!-- 操作栏模板 -->
+<script type="text/html" id="table-bar">
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="edit">
+    <i class="layui-icon layui-icon-edit"></i> 编辑
+  </a>
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="test">
+    <i class="layui-icon layui-icon-triangle-r"></i> 测试
+  </a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">
+    <i class="layui-icon layui-icon-delete"></i> 删除
+  </a>
+</script>
+
+<!-- 编辑弹窗 -->
+<div id="edit-modal" style="display:none;">
+  <div class="modal-form">
+    <form class="layui-form" lay-filter="edit-form">
+      <input type="hidden" name="id">
+      
+      <!-- 基本信息 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-set"></i> 基本信息
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">名称</label>
+          <div class="layui-input-block">
+            <input type="text" name="name" required lay-verify="required" placeholder="来源唯一标识，如：baidu_news" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">Base URL</label>
+          <div class="layui-input-block">
+            <input type="text" name="base_url" required lay-verify="required" placeholder="例如：https://www.baidu.com/s" class="layui-input">
+            <div class="form-tips">搜索接口的基础地址</div>
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <div class="layui-input-block">
+            <input type="checkbox" name="is_active" title="启用此爬虫" lay-skin="primary" checked>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 请求配置 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-code-circle"></i> 请求配置
+        </div>
+        <div class="layui-form-item layui-form-text">
+          <label class="layui-form-label">Headers</label>
+          <div class="layui-input-block">
+            <textarea name="headers" placeholder='支持 JSON 格式，如：&#10;{&#10;  "User-Agent": "Mozilla/5.0...",&#10;  "Cookie": "..."&#10;}' class="layui-textarea" rows="5"></textarea>
+          </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+          <label class="layui-form-label">Params</label>
+          <div class="layui-input-block">
+            <textarea name="params" placeholder='查询参数，如：&#10;{&#10;  "keyword_param": "word",&#10;  "rtt": "1",&#10;  "tn": "news"&#10;}' class="layui-textarea" rows="4"></textarea>
+          </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+          <label class="layui-form-label">Pagination</label>
+          <div class="layui-input-block">
+            <textarea name="pagination" placeholder='分页配置，如：&#10;{"param": "pn", "start": 0, "step": 10}' class="layui-textarea" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 解析规则 -->
+      <div class="form-section" style="border-bottom: none; margin-bottom: 0;">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-find-fill"></i> 解析规则
+        </div>
+        <div class="layui-form-item layui-form-text">
+          <label class="layui-form-label">Selectors</label>
+          <div class="layui-input-block">
+            <textarea name="selectors" placeholder='CSS选择器配置，如：&#10;{&#10;  "container": ".result-op",&#10;  "title": "h3",&#10;  "link": "h3 a",&#10;  "source": ".c-color-gray",&#10;  "image": "img.c-img"&#10;}' class="layui-textarea" rows="6"></textarea>
+          </div>
+        </div>
+      </div>
+      
+      <div class="layui-form-item" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+        <div class="layui-input-block">
+          <button class="layui-btn layui-btn-normal" lay-submit lay-filter="save-edit" style="border-radius: 6px;">
+            <i class="layui-icon layui-icon-ok"></i> 保存配置
+          </button>
+          <button type="button" class="layui-btn layui-btn-primary" id="open-analyze" style="border-radius: 6px;">
+            <i class="layui-icon layui-icon-magic"></i> 自动解析
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 自动解析弹窗 -->
+<div id="analyze-modal" style="display:none;">
+  <div class="modal-form">
+    <form class="layui-form" lay-filter="analyze-form">
+      <div class="layui-form-item">
+        <label class="layui-form-label">示例URL</label>
+        <div class="layui-input-block">
+          <input type="text" name="url" placeholder="粘贴一个搜索结果页面的完整URL" class="layui-input">
+          <div class="form-tips">例如：https://www.baidu.com/s?word=新闻&tn=news</div>
+        </div>
+      </div>
+      <div class="layui-form-item layui-form-text">
+        <label class="layui-form-label">Headers</label>
+        <div class="layui-input-block">
+          <textarea name="headers" placeholder='可选：粘贴请求头文本或JSON格式' class="layui-textarea" rows="6"></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button class="layui-btn layui-btn-normal" lay-submit lay-filter="do-analyze" style="border-radius: 6px;">
+            <i class="layui-icon layui-icon-magic"></i> 解析并填充
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['table','form','layer'], function(){
+  var table = layui.table;
+  var form = layui.form;
+  var layer = layui.layer;
+  var $ = layui.$;
+  
+  // 渲染表格
+  var tableIns = table.render({
+    elem: '#data-table',
+    url: '/crawler_mgmt/api/list',
+    page: true,
+    limit: 15,
+    cols: [[
+      {type: 'checkbox', fixed: 'left'},
+      {field: 'id', title: 'ID', width: 70, sort: true},
+      {field: 'name', title: '名称', width: 180, templet: function(d){
+        return '<span style="font-weight: 500; color: #333;">' + d.name + '</span>';
+      }},
+      {field: 'base_url', title: 'Base URL', minWidth: 320, templet: function(d){
+        return '<a href="'+d.base_url+'" target="_blank" class="layui-table-link" title="'+d.base_url+'">' + d.base_url + '</a>';
+      }},
+      {field: 'is_active', title: '状态', width: 100, align: 'center', templet: function(d){
+        return d.is_active 
+          ? '<span class="status-active">已启用</span>' 
+          : '<span class="status-inactive">已禁用</span>';
+      }},
+      {field: 'created_at', title: '创建时间', width: 170},
+      {fixed: 'right', title: '操作', toolbar: '#table-bar', width: 200}
+    ]]
+  });
+  
+  // 搜索
+  $('#do-search').on('click', function(){
+    tableIns.reload({
+      where: {keyword: $('#search-keyword').val()},
+      page: {curr: 1}
+    });
+  });
+  
+  $('#search-keyword').on('keyup', function(e){
+    if(e.keyCode === 13) $('#do-search').click();
+  });
+  
+  // 刷新
+  $('#refresh-btn').on('click', function(){
+    tableIns.reload();
+    layer.msg('已刷新', {icon: 1, time: 1000});
+  });
+  
+  // 新增
+  $('#add-btn').on('click', function(){
+    form.val('edit-form', {
+      id: '',
+      name: '',
+      base_url: '',
+      headers: '',
+      params: '',
+      pagination: '',
+      selectors: '',
+      is_active: true
+    });
+    layer.open({
+      type: 1,
+      title: '<i class="layui-icon layui-icon-add-1"></i> 新增爬虫来源',
+      area: ['750px', '680px'],
+      content: $('#edit-modal')
+    });
+  });
+  
+  // 批量删除
+  $('#batch-delete').on('click', function(){
+    var cs = table.checkStatus('data-table').data;
+    if(cs.length === 0){
+      layer.msg('请选择要删除的数据', {icon: 0});
+      return;
+    }
+    var ids = cs.map(function(i){ return i.id; });
+    
+    layer.confirm('确认删除选中的 <b style="color:#FF5722;">' + cs.length + '</b> 条数据吗？', {
+      icon: 3,
+      title: '删除确认'
+    }, function(index){
+      $.ajax({
+        url: '/crawler_mgmt/api/delete',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: ids}),
+        success: function(res){
+          if(res.code === 0){
+            layer.msg('删除成功', {icon: 1});
+            tableIns.reload();
+          } else {
+            layer.msg('删除失败: ' + res.msg, {icon: 2});
+          }
+        }
+      });
+      layer.close(index);
+    });
+  });
+  
+  // 表格行操作
+  table.on('tool(data-table)', function(obj){
+    var d = obj.data;
+    var ev = obj.event;
+    
+    if(ev === 'del'){
+      layer.confirm('确定删除这条配置吗？', {icon: 3, title: '删除确认'}, function(index){
+        $.ajax({
+          url: '/crawler_mgmt/api/delete',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ids: [d.id]}),
+          success: function(res){
+            if(res.code === 0){
+              obj.del();
+              layer.msg('删除成功', {icon: 1});
+            } else {
+              layer.msg('删除失败: ' + res.msg, {icon: 2});
+            }
+          }
+        });
+        layer.close(index);
+      });
+      
+    } else if(ev === 'edit'){
+      form.val('edit-form', {
+        id: d.id,
+        name: d.name,
+        base_url: d.base_url,
+        headers: d.headers,
+        params: d.params,
+        pagination: d.pagination,
+        selectors: d.selectors,
+        is_active: d.is_active
+      });
+      layer.open({
+        type: 1,
+        title: '<i class="layui-icon layui-icon-edit"></i> 编辑爬虫来源',
+        area: ['750px', '680px'],
+        content: $('#edit-modal')
+      });
+      
+    } else if(ev === 'test'){
+      var cfg = {
+        base_url: d.base_url,
+        headers: tryJson(d.headers),
+        params: tryJson(d.params),
+        pagination: tryJson(d.pagination),
+        selectors: tryJson(d.selectors)
+      };
+      
+      layer.prompt({
+        title: '输入测试关键词',
+        placeholder: '例如：成都',
+        formType: 0
+      }, function(value, index){
+        layer.close(index);
+        var load = layer.load(1);
+        
+        $.ajax({
+          url: '/crawler_mgmt/api/test',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({keyword: value, config: cfg, limit: 10, max_pages: 1}),
+          success: function(res){
+            layer.close(load);
+            if(res.code === 0){
+              var items = res.data || [];
+              var html = '<div style="max-height: 450px; overflow: auto;">';
+              
+              if(items.length === 0){
+                html += '<div style="padding: 40px; text-align: center; color: #999;">';
+                html += '<i class="layui-icon layui-icon-face-surprised" style="font-size: 40px;"></i>';
+                html += '<p style="margin-top: 10px;">未获取到数据</p></div>';
+              } else {
+                items.forEach(function(it){
+                  html += '<div class="test-result-item">';
+                  html += '<div class="test-result-title"><a href="'+(it.url||'#')+'" target="_blank">'+(it.title||'无标题')+'</a></div>';
+                  html += '<div class="test-result-meta"><i class="layui-icon layui-icon-website"></i> '+(it.source||'未知来源')+'</div>';
+                  html += '</div>';
+                });
+              }
+              html += '</div>';
+              
+              layer.open({
+                type: 1,
+                title: '<i class="layui-icon layui-icon-ok-circle" style="color: #5FB878;"></i> 测试结果 - 共 ' + items.length + ' 条',
+                area: ['650px', '520px'],
+                content: html
+              });
+            } else {
+              layer.msg('测试失败: ' + res.msg, {icon: 2});
+            }
+          },
+          error: function(){
+            layer.close(load);
+            layer.msg('请求失败', {icon: 2});
+          }
+        });
+      });
+    }
+  });
+  
+  // 保存表单
+  form.on('submit(save-edit)', function(data){
+    var f = data.field;
+    var payload = {
+      id: f.id || undefined,
+      name: f.name,
+      base_url: f.base_url,
+      headers: tryJson(f.headers),
+      params: tryJson(f.params),
+      pagination: tryJson(f.pagination),
+      selectors: tryJson(f.selectors),
+      is_active: !!f.is_active
+    };
+    
+    var url = f.id ? '/crawler_mgmt/api/update' : '/crawler_mgmt/api/add';
+    
+    $.ajax({
+      url: url,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(payload),
+      success: function(res){
+        if(res.code === 0){
+          layer.closeAll('page');
+          layer.msg('保存成功', {icon: 1});
+          tableIns.reload();
+        } else {
+          layer.msg('保存失败: ' + res.msg, {icon: 2});
+        }
+      }
+    });
+    return false;
+  });
+  
+  // 打开自动解析
+  $('#open-analyze').on('click', function(){
+    layer.open({
+      type: 1,
+      title: '<i class="layui-icon layui-icon-magic"></i> 自动解析配置',
+      area: ['700px', '420px'],
+      content: $('#analyze-modal')
+    });
+  });
+  
+  // 执行自动解析
+  form.on('submit(do-analyze)', function(data){
+    var f = data.field;
+    var load = layer.load(1);
+    
+    $.ajax({
+      url: '/crawler_mgmt/api/analyze',
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({url: f.url, headers: f.headers}),
+      success: function(res){
+        layer.close(load);
+        if(res.code === 0){
+          var d = res.data || {};
+          form.val('edit-form', {
+            base_url: d.base_url || '',
+            headers: JSON.stringify(d.headers || {}, null, 2),
+            params: JSON.stringify(d.params || {}, null, 2),
+            pagination: JSON.stringify(d.pagination || {}, null, 2),
+            selectors: JSON.stringify(d.selectors || {}, null, 2)
+          });
+          layer.closeAll('page');
+          layer.msg('配置已填充', {icon: 1});
+        } else {
+          layer.msg(res.msg || '解析失败', {icon: 2});
+        }
+      },
+      error: function(){
+        layer.close(load);
+        layer.msg('请求失败', {icon: 2});
+      }
+    });
+    return false;
+  });
+  
+  // JSON解析辅助函数
+  function tryJson(x){
+    if(!x) return {};
+    try {
+      var o = JSON.parse(x);
+      if(typeof o === 'object') return o;
+    } catch(e){}
+    return x;
+  }
+});
+</script>
+{% endblock %}

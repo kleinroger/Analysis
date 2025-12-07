@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Dashboard specific styles */
+    .dashboard-container {
+        background-color: #0b132b; /* Deep blue/black background */
+        color: #fff;
+        padding: 20px;
+        min-height: 85vh;
+        font-family: 'Microsoft YaHei', sans-serif;
+        border-radius: 4px;
+    }
+    .dashboard-header {
+        text-align: center;
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 30px;
+        color: #00f2ff;
+        text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        letter-spacing: 2px;
+    }
+    .chart-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid #1c2e4a;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 0 20px rgba(0, 123, 255, 0.05) inset;
+        backdrop-filter: blur(5px);
+    }
+    .chart-title {
+        font-size: 18px;
+        color: #00d0ff;
+        border-left: 4px solid #00d0ff;
+        padding-left: 15px;
+        margin-bottom: 20px;
+        font-weight: bold;
+    }
+    .data-list {
+        height: 600px;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+    .data-list-item {
+        padding: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        transition: all 0.3s;
+    }
+    .data-list-item:hover {
+        background: rgba(0, 242, 255, 0.1);
+        border-left: 2px solid #00f2ff;
+    }
+    .item-title {
+        font-size: 15px;
+        color: #e0e0e0;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .item-time {
+        color: #666;
+        font-size: 12px;
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 6px;
+        background: #0b132b;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #1c2e4a; 
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #00d0ff;
+    }
+</style>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <i class="layui-icon layui-icon-chart-screen" style="font-size: 30px; color: #00f2ff; margin-right: 10px;"></i>
+        政企舆情大数据监控大屏
+    </div>
+    
+    <div class="layui-row layui-col-space20">
+        <!-- Left Column: Map & Analysis (Wider) -->
+        <div class="layui-col-md8">
+            <div class="chart-card">
+                <div class="chart-title">全国舆情热力分布 (AI 驱动实时分析)</div>
+                <!-- Map Container -->
+                <div id="china-map" style="width: 100%; height: 600px;"></div>
+            </div>
+        </div>
+        
+        <!-- Right Column: Latest Data List -->
+        <div class="layui-col-md4">
+            <div class="chart-card">
+                <div class="chart-title">实时采集资讯 (Top 20)</div>
+                <div class="data-list" id="latest-list">
+                    <div style="text-align:center; padding: 20px; color: #666;">
+                        <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 正在加载数据...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<!-- ECharts & China Map -->
+<script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/china.js') }}"></script>
+
+<script>
+layui.use(['jquery', 'layer'], function(){
+    var $ = layui.jquery;
+    var layer = layui.layer;
+    
+    // 1. Load Latest Data
+    function loadLatest() {
+        $.get("{{ url_for('dashboard.latest_data') }}", function(res){
+            var html = '';
+            if(res && res.length > 0) {
+                res.forEach(function(item){
+                    html += '<div class="data-list-item">';
+                    html += '<div class="item-title" title="' + item.title + '">' + item.title + '</div>';
+                    html += '<div class="item-time"><i class="layui-icon layui-icon-time"></i> ' + item.created_at + '</div>';
+                    html += '</div>';
+                });
+            } else {
+                html = '<div style="text-align:center; padding: 20px; color: #666;">暂无数据</div>';
+            }
+            $('#latest-list').html(html);
+        }).fail(function(){
+            $('#latest-list').html('<div style="text-align:center; color: #d94e5d;">加载失败</div>');
+        });
+    }
+    
+    // 2. Load Heatmap Data
+    function loadHeatmap() {
+        var chart = echarts.init(document.getElementById('china-map'), 'dark');
+        chart.showLoading({
+            text: 'AI 正在分析数据...',
+            color: '#00f2ff',
+            textColor: '#00f2ff',
+            maskColor: 'rgba(0, 0, 0, 0.2)'
+        });
+        
+        $.get("{{ url_for('dashboard.heatmap_data') }}", function(data){
+            chart.hideLoading();
+            
+            // Format data for map
+            var maxVal = 0;
+            if(data && data.length > 0) {
+                data.forEach(function(d){
+                    if(d.value > maxVal) maxVal = d.value;
+                });
+            } else {
+                // Empty data
+                if(data && data.length === 0) {
+                     layer.msg('AI 分析未返回结果或无相关地域数据');
+                }
+            }
+            
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    borderColor: '#00f2ff',
+                    textStyle: { color: '#fff' },
+                    formatter: function(params) {
+                        if(params.data) {
+                            var kws = params.data.keywords ? params.data.keywords.join(', ') : '无';
+                            return '<div style="text-align:left;">' + 
+                                   '<b style="font-size:16px; color:#00f2ff;">' + params.name + '</b><br/>' +
+                                   '热度指数: <b style="color:#eac736;">' + params.value + '</b><br/>' +
+                                   '热词标签: ' + kws + 
+                                   '</div>';
+                        }
+                        return params.name;
+                    }
+                },
+                visualMap: {
+                    min: 0,
+                    max: maxVal || 10,
+                    left: '20',
+                    bottom: '20',
+                    text: ['高', '低'],
+                    calculable: true,
+                    inRange: {
+                        color: ['#142957', '#2c69cc', '#00f2ff', '#eac736', '#d94e5d']
+                    },
+                    textStyle: { color: '#fff' }
+                },
+                geo: {
+                    map: 'china',
+                    roam: true,
+                    zoom: 1.2,
+                    label: {
+                        show: true,
+                        color: '#ccc',
+                        fontSize: 10
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            color: '#fff'
+                        },
+                        itemStyle: {
+                            areaColor: '#389bb7',
+                            shadowBlur: 20,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    },
+                    itemStyle: {
+                        areaColor: '#1e2838',
+                        borderColor: '#3b5077',
+                        borderWidth: 1
+                    }
+                },
+                series: [
+                    {
+                        name: '热度',
+                        type: 'map',
+                        geoIndex: 0,
+                        data: data
+                    },
+                    {
+                        type: 'effectScatter',
+                        coordinateSystem: 'geo',
+                        data: [], // Can add scatter points if we have lat/lng, for now skip
+                        symbolSize: 10
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                chart.resize();
+            });
+            
+        }).fail(function(){
+            chart.hideLoading();
+            layer.msg('热力图数据加载失败');
+        });
+    }
+    
+    // Init
+    loadLatest();
+    loadHeatmap();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,650 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* Custom Styles for Data Collection Module */
+  .collect-container {
+    padding: 10px;
+  }
+  
+  /* Left Control Panel */
+  .control-panel {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+    position: sticky;
+    top: 10px;
+  }
+  
+  .panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 20px;
+    padding-left: 10px;
+    border-left: 4px solid #1e9fff;
+    line-height: 1.2;
+  }
+
+  .control-form .layui-form-label {
+    width: auto;
+    padding-left: 0;
+    font-weight: 500;
+    color: #666;
+  }
+  
+  .control-form .layui-input-block {
+    margin-left: 0;
+  }
+  
+  .start-btn-area {
+    margin-top: 30px;
+    text-align: center;
+  }
+  
+  .start-btn-area .layui-btn {
+    width: 100%;
+    height: 44px;
+    line-height: 44px;
+    font-size: 16px;
+    border-radius: 22px;
+    box-shadow: 0 4px 15px rgba(30, 159, 255, 0.3);
+    transition: all 0.3s;
+  }
+  
+  .start-btn-area .layui-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(30, 159, 255, 0.4);
+  }
+
+  /* Progress Section */
+  .progress-section {
+    margin-top: 30px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    display: none;
+  }
+  
+  .status-text {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Right Results Area */
+  .results-area {
+    padding-left: 15px;
+  }
+
+  .results-header {
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .results-count {
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .results-count b {
+    color: #1e9fff;
+    margin: 0 4px;
+    font-size: 16px;
+  }
+
+  /* Card Design */
+  .result-card {
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.3s;
+    height: 100%;
+    border: 1px solid transparent;
+    position: relative;
+  }
+  
+  .result-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    border-color: #e6e6e6;
+  }
+
+  .card-img-wrapper {
+    height: 160px;
+    position: relative;
+    overflow: hidden;
+    background-color: #f5f5f5;
+  }
+  
+  .card-img-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s;
+  }
+  
+  .result-card:hover .card-img-wrapper img {
+    transform: scale(1.08);
+  }
+
+  .source-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 2px 8px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 12px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+  }
+
+  .select-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    transform: scale(0.9);
+    transition: transform 0.2s;
+  }
+  
+  .select-overlay:hover {
+    transform: scale(1.1);
+  }
+  
+  .select-overlay input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #1e9fff;
+  }
+
+  .card-body {
+    padding: 15px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    height: 45px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  
+  .card-title a {
+    color: inherit;
+    transition: color 0.2s;
+  }
+  
+  .card-title a:hover {
+    color: #1e9fff;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: #888;
+    line-height: 1.6;
+    height: 63px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    margin-bottom: 15px;
+  }
+
+  .card-actions {
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .action-btn {
+    color: #666;
+    cursor: pointer;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  
+  .action-btn:hover {
+    color: #1e9fff;
+    background: #f0f9ff;
+  }
+  
+  .action-btn i {
+    margin-right: 4px;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 80px 0;
+    color: #ccc;
+  }
+  
+  .empty-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    color: #e6e6e6;
+  }
+
+  /* Responsive adjustments */
+  @media screen and (max-width: 768px) {
+    .control-panel {
+      height: auto;
+      position: static;
+      margin-bottom: 20px;
+    }
+    .results-area {
+      padding-left: 0;
+    }
+  }
+</style>
+
+<div class="layui-row collect-container">
+  
+  <!-- Left Column: Configuration -->
+  <div class="layui-col-md3 layui-col-xs12">
+    <div class="control-panel">
+      <div class="panel-title">采集配置</div>
+      
+      <div class="layui-form control-form">
+        
+        <div class="layui-form-item">
+          <label class="layui-form-label"><i class="layui-icon layui-icon-search"></i> 关键词</label>
+          <div class="layui-input-block">
+            <input type="text" id="keyword" placeholder="请输入关键词 (如: 人工智能)" class="layui-input" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label"><i class="layui-icon layui-icon-website"></i> 数据来源</label>
+          <div class="layui-input-block">
+            <select id="src" lay-filter="src-select">
+              <option value="baidu" selected>百度新闻</option>
+              <option value="sina">新浪新闻</option>
+              <option value="xinhua">新华网</option>
+              <option value="chinaso">中国搜索</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="layui-row layui-col-space10">
+          <div class="layui-col-md6">
+            <div class="layui-form-item">
+              <label class="layui-form-label">数量</label>
+              <div class="layui-input-block">
+                <input type="number" id="limit" value="30" class="layui-input">
+              </div>
+            </div>
+          </div>
+          <div class="layui-col-md6">
+            <div class="layui-form-item">
+              <label class="layui-form-label">页数</label>
+              <div class="layui-input-block">
+                <input type="number" id="pages" value="5" class="layui-input">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="start-btn-area">
+          <button class="layui-btn layui-btn-normal" id="start-btn">
+            <i class="layui-icon layui-icon-release"></i> 立即开始采集
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Progress Section -->
+      <div class="progress-section" id="progress-area">
+        <div class="status-text">
+          <span id="status-text">准备就绪</span>
+          <span id="progress-percent" style="color:#1e9fff; font-weight:bold;">0%</span>
+        </div>
+        <div class="layui-progress layui-progress-big" lay-showPercent="no" lay-filter="demo" style="background-color: #e8e8e8;">
+          <div class="layui-progress-bar layui-bg-blue" lay-percent="0%"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Right Column: Results -->
+  <div class="layui-col-md9 layui-col-xs12 results-area">
+    
+    <!-- Sticky Toolbar -->
+    <div class="results-header" id="results-header" style="display: none;">
+      <div class="results-count" id="count-text">
+        已采集 <b>0</b> 条数据
+      </div>
+      <div class="header-actions">
+        <button class="layui-btn layui-btn-primary layui-btn-sm layui-border-blue" id="select-all-btn">
+          <i class="layui-icon layui-icon-ok-circle"></i> 全选
+        </button>
+        <button class="layui-btn layui-btn-sm layui-btn-normal" id="store-selected">
+          <i class="layui-icon layui-icon-export"></i> 入库选中数据
+        </button>
+      </div>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="layui-row layui-col-space20" id="result-list">
+      <!-- Empty State Initial -->
+      <div id="empty-state" class="empty-state">
+        <i class="layui-icon layui-icon-search empty-icon"></i>
+        <p>请输入关键词并点击左侧“开始采集”按钮</p>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var jobId = null;
+var items = [];
+var isAllSelected = false;
+var autoScroll = false;
+var lastRenderCount = 0;
+
+layui.use(['layer', 'element', 'form'], function(){
+  var layer = layui.layer;
+  var element = layui.element;
+  var form = layui.form;
+
+  // Initialize form
+  form.render();
+
+  // Render List Function
+  window.renderList = function(){
+    var html = '';
+    
+    if(items.length > 0) {
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('results-header').style.display = 'flex';
+        document.getElementById('count-text').innerHTML = '已采集 <b>' + items.length + '</b> 条数据';
+    } else {
+        // Only show empty state if we are not running a job or just started
+        if (!jobId) {
+          document.getElementById('empty-state').style.display = 'block';
+        }
+        document.getElementById('results-header').style.display = 'none';
+    }
+
+    items.forEach(function(it, idx){
+      var placeholder = "{{ url_for('static', filename='images/nopic.webp') }}";
+      var imgSrc = (it.cover && it.cover.length>0) ? it.cover : placeholder;
+      var summary = it.summary || '暂无摘要内容...';
+      
+      html += `
+      <div class="layui-col-md4 layui-col-sm6 layui-col-xs12">
+        <div class="result-card">
+          <div class="card-img-wrapper">
+            <div class="select-overlay">
+              <input type="checkbox" class="store-check" data-url="${it.url||''}">
+            </div>
+            <span class="source-badge">${it.source||'未知'}</span>
+            <a href="${it.url||'#'}" target="_blank">
+              <img src="${imgSrc}" onerror="this.onerror=null;this.src='${placeholder}'">
+            </a>
+          </div>
+          <div class="card-body">
+            <div class="card-title" title="${it.title||''}">
+              <a href="${it.url||'#'}" target="_blank">${it.title||'无标题'}</a>
+            </div>
+            <div class="card-desc">${summary}</div>
+            <div class="card-actions">
+              <span style="font-size:12px; color:#999;">${it.date || '刚刚'}</span>
+              <button class="action-btn store-one" data-url="${it.url||''}">
+                <i class="layui-icon layui-icon-download-circle"></i> 存储
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    });
+    
+    document.getElementById('result-list').innerHTML = html || document.getElementById('result-list').innerHTML;
+    
+    // Scroll to bottom if auto-scroll is enabled and new items added
+    if(autoScroll && items.length > 0){
+      if(items.length > lastRenderCount){
+        lastRenderCount = items.length;
+        // Optional: smooth scroll to bottom or just stay where user is? 
+        // Let's scroll window slightly to indicate progress
+        // window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+      }
+    }
+    
+    // Re-apply check state if needed
+    if(isAllSelected) {
+      var checks = document.querySelectorAll('.store-check');
+      checks.forEach(c => c.checked = true);
+    }
+  }
+
+  // Polling Function
+  function poll(){
+    if(!jobId) return;
+    fetch('/collect/api/status?job_id='+encodeURIComponent(jobId))
+      .then(r => r.json())
+      .then(res => {
+        var p = res.progress || 0;
+        element.progress('demo', p+'%');
+        document.getElementById('progress-percent').innerText = p+'%';
+        
+        if(res.status_text) {
+            document.getElementById('status-text').innerText = res.status_text;
+        }
+
+        if(res.items && res.items.length > items.length) {
+             items = res.items;
+             renderList();
+        }
+
+        if(res.state === 'running' || res.state === 'pending'){
+          setTimeout(poll, 1000);
+        } else if(res.state === 'completed') {
+          layer.msg('采集完成！', {icon: 1});
+          document.getElementById('status-text').innerText = '采集完成';
+          document.getElementById('start-btn').classList.remove('layui-btn-disabled');
+          document.getElementById('start-btn').disabled = false;
+          document.getElementById('start-btn').innerHTML = '<i class="layui-icon layui-icon-release"></i> 重新开始采集';
+          autoScroll = false;
+        } else if(res.state === 'error') {
+          layer.msg('采集出错：' + res.error, {icon: 2});
+          document.getElementById('status-text').innerText = '出错: ' + res.error;
+          document.getElementById('start-btn').classList.remove('layui-btn-disabled');
+          document.getElementById('start-btn').disabled = false;
+          autoScroll = false;
+        }
+      })
+      .catch(e => {
+        console.error(e);
+        setTimeout(poll, 2000);
+      });
+  }
+
+  // Start Button
+  document.getElementById('start-btn').addEventListener('click', function(){
+    var btn = this;
+    if(btn.classList.contains('layui-btn-disabled')) return;
+
+    var q = document.getElementById('keyword').value;
+    var limit = parseInt(document.getElementById('limit').value||'30');
+    var pages = parseInt(document.getElementById('pages').value||'5');
+    var src = document.getElementById('src').value;
+    
+    if((src === 'baidu' || src === 'chinaso' || src === 'sina') && !q) {
+        layer.tips('请输入关键词', '#keyword', {tips: [1, '#FF5722']});
+        document.getElementById('keyword').focus();
+        return;
+    }
+
+    // Reset UI
+    items = [];
+    isAllSelected = false;
+    renderList(); // Clears list
+    
+    // Show progress area
+    document.getElementById('progress-area').style.display = 'block';
+    element.progress('demo', '0%');
+    document.getElementById('status-text').innerText = '正在初始化...';
+    document.getElementById('empty-state').style.display = 'none';
+    
+    // Disable button
+    btn.classList.add('layui-btn-disabled');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 采集中...';
+    
+    autoScroll = true;
+    lastRenderCount = 0;
+
+    fetch('/collect/api/start', {
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body: JSON.stringify({q:q, limit:limit, max_pages:pages, src:src})
+    })
+    .then(r => r.json())
+    .then(res => {
+        if(res.error) {
+            layer.msg(res.error, {icon: 2});
+            btn.classList.remove('layui-btn-disabled');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="layui-icon layui-icon-release"></i> 立即开始采集';
+            return;
+        }
+        jobId = res.job_id;
+        poll();
+    })
+    .catch(e => {
+        layer.msg('请求失败', {icon: 2});
+        btn.classList.remove('layui-btn-disabled');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="layui-icon layui-icon-release"></i> 立即开始采集';
+    });
+  });
+
+  // Select All
+  document.getElementById('select-all-btn').addEventListener('click', function(){
+    isAllSelected = !isAllSelected;
+    var checks = document.querySelectorAll('.store-check');
+    checks.forEach(function(c){
+        c.checked = isAllSelected;
+    });
+    
+    var btnIcon = this.querySelector('i');
+    if(isAllSelected) {
+        this.classList.remove('layui-btn-primary', 'layui-border-blue');
+        this.classList.add('layui-btn-normal');
+        btnIcon.classList.remove('layui-icon-ok-circle');
+        btnIcon.classList.add('layui-icon-ok');
+        this.innerHTML = '<i class="layui-icon layui-icon-ok"></i> 取消全选';
+    } else {
+        this.classList.add('layui-btn-primary', 'layui-border-blue');
+        this.classList.remove('layui-btn-normal');
+        btnIcon.classList.add('layui-icon-ok-circle');
+        btnIcon.classList.remove('layui-icon-ok');
+        this.innerHTML = '<i class="layui-icon layui-icon-ok-circle"></i> 全选';
+    }
+  });
+
+  // Store Selected
+  document.getElementById('store-selected').addEventListener('click', function(){
+    var checks = document.querySelectorAll('.store-check:checked');
+    if(checks.length === 0) {
+        layer.msg('请先勾选要存储的数据', {icon: 0, anim: 6});
+        return;
+    }
+    
+    var selected = [];
+    checks.forEach(function(c){
+        var url = c.getAttribute('data-url');
+        var item = items.find(it => it.url === url);
+        if(item) selected.push(item);
+    });
+
+    var loadIdx = layer.load(2);
+    fetch('/collect/api/store', {
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body: JSON.stringify({items: selected, keyword: document.getElementById('keyword').value})
+    })
+    .then(r => r.json())
+    .then(res => {
+        layer.close(loadIdx);
+        layer.alert(`成功存储 ${res.saved} 条数据` + (res.updated > 0 ? `，更新 ${res.updated} 条` : ''), {
+            icon: 1,
+            title: '入库成功'
+        });
+    })
+    .catch(e => {
+        layer.close(loadIdx);
+        layer.msg('存储请求失败', {icon: 2});
+    });
+  });
+
+  // Delegate events for dynamic buttons (Store One)
+  document.getElementById('result-list').addEventListener('click', function(e){
+    var btn = e.target.closest('.store-one');
+    if(btn){
+        var url = btn.getAttribute('data-url');
+        var item = items.find(it => it.url === url);
+        if(!item) return;
+
+        var icon = btn.querySelector('i');
+        icon.className = 'layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop';
+
+        fetch('/collect/api/store', {
+            method:'POST', 
+            headers:{'Content-Type':'application/json'}, 
+            body: JSON.stringify({items: [item], keyword: document.getElementById('keyword').value})
+        })
+        .then(r => r.json())
+        .then(res => {
+            icon.className = 'layui-icon layui-icon-ok';
+            btn.style.color = '#5FB878';
+            layer.msg('已存储', {icon: 1, time: 1000});
+        })
+        .catch(err => {
+             icon.className = 'layui-icon layui-icon-download-circle';
+             layer.msg('存储失败', {icon: 2});
+        });
+    }
+  });
+
+});
+</script>
+{% endblock %}

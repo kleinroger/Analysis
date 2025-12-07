@@ -1,0 +1,305 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">
+    <span class="layui-breadcrumb">
+      <a href="/">首页</a>
+      <a><cite>AI引擎管理</cite></a>
+    </span>
+  </div>
+  <div class="layui-card-body">
+    <div class="layui-row layui-col-space15">
+      <div class="layui-col-md12" style="padding-bottom: 15px;">
+        <button class="layui-btn" id="add-engine">
+          <i class="layui-icon layui-icon-add-1"></i> 添加AI引擎
+        </button>
+      </div>
+    </div>
+
+    <!-- Engine Showcase Grid -->
+    <div class="layui-row layui-col-space15" id="engine-list">
+      <!-- Cards will be injected here -->
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="engine-modal" style="display: none; padding: 20px;">
+  <form class="layui-form" lay-filter="engine-form">
+    <input type="hidden" name="id">
+    <div class="layui-form-item">
+      <label class="layui-form-label">服务商</label>
+      <div class="layui-input-block">
+        <input type="text" name="provider_name" required lay-verify="required" placeholder="如：OpenAI, Azure, Moonshot" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">API地址</label>
+      <div class="layui-input-block">
+        <input type="text" name="api_url" required lay-verify="required|url" placeholder="https://api.openai.com/v1" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">API Key</label>
+      <div class="layui-input-block">
+        <input type="password" name="api_key" required lay-verify="required" placeholder="sk-..." autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">模型名称</label>
+      <div class="layui-input-block">
+        <input type="text" name="model_name" required lay-verify="required" placeholder="如：gpt-4, gpt-3.5-turbo" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">状态</label>
+      <div class="layui-input-block">
+        <input type="checkbox" name="is_active" lay-skin="switch" lay-text="启用|禁用" checked value="1">
+      </div>
+    </div>
+    <div class="layui-form-item" style="text-align: right;">
+      <button class="layui-btn" lay-submit lay-filter="save-engine">保存</button>
+    </div>
+  </form>
+</div>
+
+<!-- Chat Test Modal -->
+<div id="chat-modal" style="display: none; padding: 20px;">
+  <div class="layui-card" style="box-shadow: none;">
+    <div class="layui-card-header" id="chat-title" style="border-bottom: 1px solid #eee;">对话测试</div>
+    <div class="layui-card-body">
+      <div id="chat-history" style="height: 300px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">
+        <div style="text-align: center; color: #ccc; margin-top: 50px;">开始与模型对话吧...</div>
+      </div>
+      <div class="layui-form-item" style="margin-bottom: 0;">
+        <div class="layui-input-group" style="width: 100%;">
+          <input type="text" id="chat-input" placeholder="输入消息..." class="layui-input" style="border-radius: 2px 0 0 2px;">
+          <div class="layui-input-suffix" style="padding: 0;">
+            <button class="layui-btn" id="send-msg" style="border-radius: 0 2px 2px 0;">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer', 'form', 'jquery'], function(){
+  var layer = layui.layer;
+  var form = layui.form;
+  var $ = layui.$;
+  var currentChatEngineId = null;
+
+  loadEngines();
+
+  function loadEngines(){
+    $.get('/ai_engine/api/list', function(res){
+      if(res.code === 0){
+        renderEngines(res.data);
+      } else {
+        layer.msg('加载失败: ' + res.msg, {icon: 2});
+      }
+    });
+  }
+
+  function renderEngines(list){
+    var html = '';
+    if(list.length === 0){
+        html = '<div class="layui-col-md12" style="text-align:center; color:#999; padding:50px;">暂无AI引擎，请点击上方添加</div>';
+    } else {
+        list.forEach(function(item){
+            var activeBadge = item.is_active ? '<span class="layui-badge layui-bg-green">启用</span>' : '<span class="layui-badge layui-bg-gray">禁用</span>';
+            html += '<div class="layui-col-md3 layui-col-sm6">';
+            html += '  <div class="layui-card" style="box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.3s;">';
+            html += '    <div class="layui-card-header" style="font-weight:bold; color:#393D49;">';
+            html +=        item.provider_name;
+            html += '      <div style="float:right;">' + activeBadge + '</div>';
+            html += '    </div>';
+            html += '    <div class="layui-card-body" style="height: 120px;">';
+            html += '      <p style="margin-bottom:5px;"><i class="layui-icon layui-icon-engine"></i> <strong>模型:</strong> ' + item.model_name + '</p>';
+            html += '      <p style="margin-bottom:5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="'+item.api_url+'"><i class="layui-icon layui-icon-website"></i> <strong>地址:</strong> ' + item.api_url + '</p>';
+            html += '      <p style="color:#999; font-size:12px; margin-top:10px;">更新于: ' + item.updated_at + '</p>';
+            html += '    </div>';
+            html += '    <div class="layui-card-footer" style="padding: 10px; text-align: right; border-top: 1px solid #f6f6f6;">';
+            html += '      <button class="layui-btn layui-btn-xs layui-btn-warm chat-btn" data-id="'+item.id+'">对话测试</button>';
+            html += '      <button class="layui-btn layui-btn-xs layui-btn-normal edit-btn" data-id="'+item.id+'">编辑</button>';
+            html += '      <button class="layui-btn layui-btn-xs layui-btn-danger del-btn" data-id="'+item.id+'">删除</button>';
+            html += '    </div>';
+            html += '  </div>';
+            html += '</div>';
+        });
+    }
+    $('#engine-list').html(html);
+    
+    // Bind events
+    $('.edit-btn').on('click', function(){
+        var id = $(this).data('id');
+        var item = list.find(x => x.id == id);
+        openModal(item);
+    });
+    
+    $('.del-btn').on('click', function(){
+        var id = $(this).data('id');
+        layer.confirm('确定要删除该引擎吗？', function(index){
+            $.ajax({
+                url: '/ai_engine/api/delete',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({id: id}),
+                success: function(res){
+                    if(res.code === 0){
+                        layer.msg('删除成功', {icon: 1});
+                        loadEngines();
+                    } else {
+                        layer.msg('删除失败: ' + res.msg, {icon: 2});
+                    }
+                }
+            });
+            layer.close(index);
+        });
+    });
+    
+    $('.chat-btn').on('click', function(){
+        var id = $(this).data('id');
+        var item = list.find(x => x.id == id);
+        openChat(item);
+    });
+  }
+
+  $('#add-engine').on('click', function(){
+    openModal();
+  });
+
+  function openModal(data){
+    // Reset form
+    $('input[name="id"]').val('');
+    $('input[name="provider_name"]').val('');
+    $('input[name="api_url"]').val('');
+    $('input[name="api_key"]').val('');
+    $('input[name="model_name"]').val('');
+    $('input[name="is_active"]').prop('checked', true);
+    
+    var title = '添加AI引擎';
+    if(data){
+        title = '编辑AI引擎';
+        $('input[name="id"]').val(data.id);
+        $('input[name="provider_name"]').val(data.provider_name);
+        $('input[name="api_url"]').val(data.api_url);
+        $('input[name="api_key"]').val(data.api_key);
+        $('input[name="model_name"]').val(data.model_name);
+        $('input[name="is_active"]').prop('checked', data.is_active);
+    }
+    form.render();
+    
+    layer.open({
+        type: 1,
+        title: title,
+        area: ['500px', '450px'],
+        content: $('#engine-modal')
+    });
+  }
+  
+  function openChat(data){
+      currentChatEngineId = data.id;
+      $('#chat-title').text('对话测试 - ' + data.provider_name + ' (' + data.model_name + ')');
+      $('#chat-history').html('<div style="text-align: center; color: #ccc; margin-top: 50px;">开始与模型对话吧...</div>');
+      $('#chat-input').val('');
+      
+      layer.open({
+          type: 1,
+          title: false,
+          closeBtn: 1,
+          area: ['600px', '500px'],
+          content: $('#chat-modal'),
+          shadeClose: false
+      });
+  }
+  
+  function appendMessage(role, content){
+      var align = role === 'user' ? 'right' : 'left';
+      var bg = role === 'user' ? '#95ec69' : '#fff';
+      var html = '<div style="text-align: '+align+'; margin: 10px 0;">';
+      html += '<div style="display: inline-block; background: '+bg+'; padding: 8px 12px; border-radius: 4px; text-align: left; max-width: 80%; word-break: break-all; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'+content+'</div>';
+      html += '</div>';
+      
+      var history = $('#chat-history');
+      if(history.find('div').length === 1 && history.find('div').text().includes('开始与模型对话吧')){
+          history.empty();
+      }
+      history.append(html);
+      history.scrollTop(history[0].scrollHeight);
+  }
+  
+  $('#send-msg').on('click', function(){
+      sendMessage();
+  });
+  
+  $('#chat-input').on('keypress', function(e){
+      if(e.which === 13){
+          sendMessage();
+      }
+  });
+  
+  function sendMessage(){
+      var msg = $('#chat-input').val().trim();
+      if(!msg) return;
+      
+      if(!currentChatEngineId){
+          layer.msg('引擎ID丢失，请重新打开对话框', {icon: 2});
+          return;
+      }
+      
+      appendMessage('user', msg);
+      $('#chat-input').val('');
+      
+      var loadingId = layer.load(1);
+      
+      $.ajax({
+          url: '/ai_engine/api/chat_test',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({id: currentChatEngineId, message: msg}),
+          success: function(res){
+              layer.close(loadingId);
+              if(res.code === 0){
+                  appendMessage('ai', res.data);
+              } else {
+                  appendMessage('ai', '<span style="color: red;">Error: ' + res.msg + '</span>');
+              }
+          },
+          error: function(){
+              layer.close(loadingId);
+              appendMessage('ai', '<span style="color: red;">Network Error</span>');
+          }
+      });
+  }
+
+  form.on('submit(save-engine)', function(data){
+    var field = data.field;
+    field.is_active = field.is_active === '1'; // Convert to boolean
+    var url = field.id ? '/ai_engine/api/update' : '/ai_engine/api/add';
+    
+    $.ajax({
+        url: url,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(field),
+        success: function(res){
+            if(res.code === 0){
+                layer.closeAll('page');
+                layer.msg('保存成功', {icon: 1});
+                loadEngines();
+            } else {
+                layer.msg('保存失败: ' + res.msg, {icon: 2});
+            }
+        }
+    });
+    return false;
+  });
+
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1929 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* ========== 全局变量 ========== */
+    :root {
+        --chat-primary: #1e9fff;
+        --chat-primary-dark: #0d8de8;
+        --chat-success: #52c41a;
+        --chat-bg: #f0f2f5;
+        --chat-sidebar-bg: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+        --chat-bubble-self: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --chat-bubble-other: #ffffff;
+        --chat-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        --chat-radius: 12px;
+    }
+
+    /* ========== 动画定义 ========== */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    @keyframes typing {
+        0%, 60%, 100% { opacity: 0.3; }
+        30% { opacity: 1; }
+    }
+
+    /* ========== 主容器 ========== */
+    .chat-wrapper {
+        height: calc(100vh - 140px);
+        min-height: 500px;
+        background: var(--chat-bg);
+        border-radius: var(--chat-radius);
+        overflow: hidden;
+        box-shadow: var(--chat-shadow);
+        animation: fadeInUp 0.5s ease-out;
+    }
+    .chat-container {
+        display: flex;
+        height: 100%;
+        background: #fff;
+    }
+
+    /* ========== 侧边栏 ========== */
+    .chat-sidebar {
+        width: 280px;
+        min-width: 280px;
+        background: var(--chat-sidebar-bg);
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s ease;
+    }
+    .sidebar-header {
+        padding: 20px;
+        background: rgba(0,0,0,0.1);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-header h3 {
+        color: #fff;
+        font-size: 18px;
+        margin: 0 0 15px 0;
+        display: flex;
+        align-items: center;
+    }
+    .sidebar-header h3 i {
+        margin-right: 10px;
+        font-size: 22px;
+    }
+    .chat-search {
+        position: relative;
+    }
+    .chat-search input {
+        width: 100%;
+        height: 38px;
+        padding: 0 15px 0 38px;
+        border: none;
+        border-radius: 19px;
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
+    .chat-search input::placeholder { color: rgba(255,255,255,0.5); }
+    .chat-search input:focus {
+        background: rgba(255,255,255,0.2);
+        outline: none;
+    }
+    .chat-search i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255,255,255,0.5);
+    }
+
+    /* ========== 用户列表 ========== */
+    .user-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 0;
+    }
+    .user-list::-webkit-scrollbar { width: 4px; }
+    .user-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    
+    .user-item {
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-left: 3px solid transparent;
+        margin: 2px 0;
+    }
+    .user-item:hover {
+        background: rgba(255,255,255,0.08);
+        border-left-color: var(--chat-primary);
+    }
+    .user-item.active {
+        background: rgba(30, 159, 255, 0.2);
+        border-left-color: var(--chat-primary);
+    }
+    .user-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        margin-right: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 600;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        position: relative;
+    }
+    .user-avatar.online::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 10px;
+        height: 10px;
+        background: var(--chat-success);
+        border: 2px solid #2c3e50;
+        border-radius: 50%;
+    }
+    .user-info { flex: 1; overflow: hidden; }
+    .user-name {
+        font-weight: 500;
+        font-size: 14px;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .user-status {
+        font-size: 12px;
+        color: rgba(255,255,255,0.5);
+        margin-top: 2px;
+    }
+    .user-badge {
+        background: #ff4d4f;
+        color: #fff;
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+    }
+
+    /* ========== 聊天主区域 ========== */
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--chat-bg);
+        min-width: 0;
+    }
+    .chat-header {
+        height: 60px;
+        background: #fff;
+        border-bottom: 1px solid #e8e8e8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .chat-header-left {
+        display: flex;
+        align-items: center;
+    }
+    .chat-header-left h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+    }
+    .chat-header-left span {
+        font-size: 12px;
+        color: #999;
+        margin-left: 10px;
+    }
+    .chat-header-actions i {
+        font-size: 20px;
+        color: #666;
+        cursor: pointer;
+        margin-left: 15px;
+        transition: color 0.3s;
+    }
+    .chat-header-actions i:hover { color: var(--chat-primary); }
+
+    /* ========== 消息区域 ========== */
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: linear-gradient(180deg, #f5f7fa 0%, #e8ecf1 100%);
+    }
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+
+    /* 时间分隔 */
+    .msg-time-divider {
+        text-align: center;
+        margin: 20px 0;
+        position: relative;
+    }
+    .msg-time-divider span {
+        background: #e8ecf1;
+        padding: 4px 12px;
+        font-size: 12px;
+        color: #999;
+        border-radius: 10px;
+    }
+
+    /* 消息项 */
+    .msg-item {
+        display: flex;
+        margin-bottom: 16px;
+        animation: slideInLeft 0.3s ease-out;
+    }
+    .msg-item.self {
+        flex-direction: row-reverse;
+        animation: slideInRight 0.3s ease-out;
+    }
+    .msg-avatar-wrap {
+        flex-shrink: 0;
+    }
+    .msg-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .msg-content-wrapper {
+        max-width: 65%;
+        margin: 0 12px;
+    }
+    .msg-name {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+    }
+    .msg-name .time {
+        margin-left: 8px;
+        color: #aaa;
+    }
+    .msg-item.self .msg-name {
+        flex-direction: row-reverse;
+    }
+    .msg-item.self .msg-name .time {
+        margin-left: 0;
+        margin-right: 8px;
+    }
+    .msg-bubble {
+        padding: 12px 16px;
+        border-radius: 18px;
+        line-height: 1.6;
+        word-break: break-word;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .msg-item:not(.self) .msg-bubble {
+        background: var(--chat-bubble-other);
+        border-top-left-radius: 4px;
+        color: #333;
+    }
+    .msg-item.self .msg-bubble {
+        background: var(--chat-bubble-self);
+        border-top-right-radius: 4px;
+        color: #fff;
+    }
+
+    /* ========== 输入区域 ========== */
+    .chat-input-area {
+        background: #fff;
+        border-top: 1px solid #e8e8e8;
+        padding: 0;
+    }
+    .chat-toolbar {
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #f0f0f0;
+        position: relative;
+    }
+    .toolbar-btn {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-right: 8px;
+    }
+    .toolbar-btn:hover {
+        background: #f0f0f0;
+    }
+    .toolbar-btn i {
+        font-size: 20px;
+        color: #666;
+    }
+    .toolbar-btn:hover i { color: var(--chat-primary); }
+
+    .chat-input-wrapper {
+        display: flex;
+        padding: 15px;
+        align-items: flex-end;
+    }
+    .chat-input {
+        flex: 1;
+        min-height: 44px;
+        max-height: 120px;
+        padding: 10px 15px;
+        border: 1px solid #e8e8e8;
+        border-radius: 22px;
+        resize: none;
+        outline: none;
+        font-size: 14px;
+        line-height: 1.5;
+        transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .chat-input:focus {
+        border-color: var(--chat-primary);
+        box-shadow: 0 0 0 2px rgba(30, 159, 255, 0.1);
+    }
+    .chat-send-btn {
+        margin-left: 12px;
+        width: 60px;
+        height: 44px;
+        border-radius: 22px;
+        background: var(--chat-primary);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chat-send-btn:hover {
+        background: var(--chat-primary-dark);
+        transform: scale(1.05);
+    }
+    .chat-send-btn:active { transform: scale(0.98); }
+
+    /* ========== Emoji 选择器 ========== */
+    .emoji-picker {
+        display: none;
+        position: absolute;
+        bottom: 50px;
+        left: 10px;
+        width: 320px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 1000;
+        animation: fadeInUp 0.2s ease-out;
+    }
+    .emoji-picker.show { display: block; }
+    .emoji-picker-header {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+    }
+    .emoji-picker-body {
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 5px;
+    }
+    .emoji-item {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+    .emoji-item:hover {
+        background: #f0f0f0;
+        transform: scale(1.2);
+    }
+
+    /* ========== 上传预览区域 ========== */
+    .upload-preview {
+        padding: 12px 15px;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        animation: fadeInUp 0.2s ease-out;
+    }
+    .preview-content {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        overflow: hidden;
+    }
+    .preview-image {
+        max-width: 120px;
+        max-height: 80px;
+        border-radius: 8px;
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .preview-file {
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .preview-file-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+    }
+    .preview-file-icon i {
+        font-size: 20px;
+        color: #fff;
+    }
+    .preview-file-info {
+        flex: 1;
+        overflow: hidden;
+    }
+    .preview-file-name {
+        font-size: 14px;
+        color: #333;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+    }
+    .preview-file-size {
+        font-size: 12px;
+        color: #999;
+        margin-top: 2px;
+    }
+    .preview-close {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: all 0.3s;
+        margin-left: 15px;
+    }
+    .preview-close:hover {
+        background: #ff4d4f;
+    }
+    .preview-close:hover i {
+        color: #fff;
+    }
+    .preview-close i {
+        font-size: 16px;
+        color: #999;
+    }
+    .upload-progress {
+        margin-left: 15px;
+        width: 100px;
+    }
+    .upload-progress .layui-progress {
+        height: 6px;
+        background: #e8e8e8;
+    }
+
+    /* ========== 图片消息样式 ========== */
+    .msg-image {
+        max-width: 240px;
+        max-height: 180px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: transform 0.3s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .msg-image:hover {
+        transform: scale(1.02);
+    }
+
+    /* ========== 文件消息样式 ========== */
+    .msg-file {
+        display: flex;
+        align-items: center;
+        padding: 12px 15px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 12px;
+        min-width: 200px;
+        max-width: 280px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .msg-file:hover {
+        background: #fff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .msg-item.self .msg-file {
+        background: rgba(255,255,255,0.2);
+    }
+    .msg-item.self .msg-file:hover {
+        background: rgba(255,255,255,0.3);
+    }
+    .msg-file-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        flex-shrink: 0;
+    }
+    .msg-file-icon i {
+        font-size: 22px;
+        color: #fff;
+    }
+    .msg-file-icon.pdf { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); }
+    .msg-file-icon.doc { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .msg-file-icon.xls { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .msg-file-icon.ppt { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .msg-file-icon.zip { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+    .msg-file-icon.media { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .msg-file-icon.default { background: linear-gradient(135deg, #89909f 0%, #5c6370 100%); }
+    .msg-file-info {
+        flex: 1;
+        overflow: hidden;
+    }
+    .msg-file-name {
+        font-size: 14px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .msg-item:not(.self) .msg-file-name { color: #333; }
+    .msg-item.self .msg-file-name { color: #fff; }
+    .msg-file-size {
+        font-size: 12px;
+        margin-top: 3px;
+    }
+    .msg-item:not(.self) .msg-file-size { color: #999; }
+    .msg-item.self .msg-file-size { color: rgba(255,255,255,0.8); }
+    .msg-file-download {
+        margin-left: 10px;
+        color: var(--chat-primary);
+    }
+    .msg-item.self .msg-file-download { color: rgba(255,255,255,0.9); }
+
+    /* ========== 图片预览弹窗 ========== */
+    .image-preview-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+        cursor: zoom-out;
+    }
+    .image-preview-modal.show {
+        display: flex;
+    }
+    .image-preview-modal img {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 4px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    /* ========== 音乐卡片样式 ========== */
+    .msg-music-card {
+        width: 280px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+        animation: fadeInUp 0.4s ease-out;
+    }
+    .music-card-header {
+        position: relative;
+        height: 160px;
+        overflow: hidden;
+    }
+    .music-card-cover {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+    }
+    .msg-music-card:hover .music-card-cover {
+        transform: scale(1.05);
+    }
+    .music-card-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%);
+        display: flex;
+        align-items: flex-end;
+        padding: 15px;
+    }
+    .music-card-title {
+        color: #fff;
+        font-size: 16px;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    .music-card-singer {
+        color: rgba(255,255,255,0.85);
+        font-size: 13px;
+        margin-top: 4px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .music-card-body {
+        padding: 12px 15px;
+        background: rgba(255,255,255,0.1);
+    }
+    .music-player {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .music-play-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .music-play-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .music-play-btn:active {
+        transform: scale(0.95);
+    }
+    .music-play-btn i {
+        font-size: 18px;
+        color: #667eea;
+        margin-left: 2px;
+    }
+    .music-play-btn.playing i {
+        margin-left: 0;
+    }
+    .music-progress-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .music-progress-bar {
+        height: 4px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        overflow: hidden;
+        cursor: pointer;
+    }
+    .music-progress-fill {
+        height: 100%;
+        background: #fff;
+        border-radius: 2px;
+        width: 0%;
+        transition: width 0.1s linear;
+    }
+    .music-time {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: rgba(255,255,255,0.8);
+    }
+    .music-card-footer {
+        padding: 8px 15px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .music-card-tag {
+        font-size: 11px;
+        color: rgba(255,255,255,0.7);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .music-card-tag i {
+        font-size: 14px;
+    }
+
+    /* ========== 电影卡片样式 ========== */
+    .msg-movie-card {
+        width: 420px;
+        max-width: 100%;
+        background: #1a1a2e;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        animation: fadeInUp 0.4s ease-out;
+    }
+    .movie-card-header {
+        padding: 12px 15px;
+        background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .movie-card-title {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .movie-card-title i {
+        color: #e94560;
+        font-size: 18px;
+    }
+    .movie-card-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .movie-card-actions i {
+        color: rgba(255,255,255,0.6);
+        font-size: 16px;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+    .movie-card-actions i:hover {
+        color: #fff;
+    }
+    .movie-card-body {
+        position: relative;
+        width: 100%;
+        height: 400px;
+        background: #000;
+    }
+    .movie-card-body iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    .movie-card-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        color: rgba(255,255,255,0.7);
+        font-size: 14px;
+    }
+    .movie-card-loading i {
+        font-size: 36px;
+        margin-bottom: 10px;
+        animation: pulse 1.5s infinite;
+    }
+    .movie-card-footer {
+        padding: 10px 15px;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .movie-card-tag {
+        font-size: 11px;
+        color: rgba(255,255,255,0.5);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .movie-fullscreen-btn {
+        padding: 6px 12px;
+        background: #e94560;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.3s;
+    }
+    .movie-fullscreen-btn:hover {
+        background: #ff6b6b;
+        transform: scale(1.05);
+    }
+    @media screen and (max-width: 480px) {
+        .msg-movie-card {
+            width: 100%;
+        }
+        .movie-card-body {
+            height: 240px;
+        }
+    }
+
+    /* ========== 天气卡片样式 ========== */
+    .msg-weather-card {
+        width: 320px;
+        max-width: 100%;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        animation: fadeInUp 0.4s ease-out;
+    }
+    .weather-card-header {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+    .weather-card-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 100%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    }
+    .weather-location {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 10px;
+    }
+    .weather-location i {
+        font-size: 16px;
+    }
+    .weather-now {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .weather-temp-wrap {
+        display: flex;
+        flex-direction: column;
+    }
+    .weather-temp {
+        font-size: 48px;
+        font-weight: 300;
+        line-height: 1;
+    }
+    .weather-temp sup {
+        font-size: 24px;
+        vertical-align: top;
+    }
+    .weather-text {
+        font-size: 16px;
+        margin-top: 5px;
+        opacity: 0.9;
+    }
+    .weather-icon {
+        width: 80px;
+        height: 80px;
+    }
+    .weather-icon img {
+        width: 100%;
+        height: 100%;
+    }
+    .weather-details {
+        display: flex;
+        justify-content: space-around;
+        padding: 12px 15px;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+    }
+    .weather-detail-item {
+        text-align: center;
+        font-size: 12px;
+    }
+    .weather-detail-item .label {
+        opacity: 0.8;
+        margin-bottom: 4px;
+    }
+    .weather-detail-item .value {
+        font-weight: 500;
+    }
+    .weather-forecast {
+        background: #fff;
+        padding: 15px;
+    }
+    .weather-forecast-title {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .weather-forecast-title i {
+        color: #667eea;
+    }
+    .weather-forecast-list {
+        display: flex;
+        justify-content: space-between;
+    }
+    .weather-forecast-item {
+        flex: 1;
+        text-align: center;
+        padding: 8px 5px;
+        border-radius: 8px;
+        transition: background 0.3s;
+    }
+    .weather-forecast-item:hover {
+        background: #f5f7fa;
+    }
+    .weather-forecast-item .date {
+        font-size: 12px;
+        color: #999;
+        margin-bottom: 8px;
+    }
+    .weather-forecast-item .icon {
+        width: 36px;
+        height: 36px;
+        margin: 0 auto 8px;
+    }
+    .weather-forecast-item .icon img {
+        width: 100%;
+        height: 100%;
+    }
+    .weather-forecast-item .temp {
+        font-size: 13px;
+        color: #333;
+    }
+    .weather-forecast-item .temp .high {
+        color: #e74c3c;
+        font-weight: 500;
+    }
+    .weather-forecast-item .temp .low {
+        color: #3498db;
+    }
+    .weather-forecast-item .text {
+        font-size: 11px;
+        color: #666;
+        margin-top: 4px;
+    }
+    .weather-card-footer {
+        padding: 10px 15px;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #999;
+    }
+    .weather-card-footer i {
+        margin-right: 4px;
+    }
+
+    /* ========== 移动端侧边栏切换按钮 ========== */
+    .sidebar-toggle {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 50px;
+        height: 50px;
+        background: var(--chat-primary);
+        color: #fff;
+        border-radius: 50%;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(30, 159, 255, 0.4);
+        cursor: pointer;
+        z-index: 1001;
+        font-size: 22px;
+    }
+
+    /* ========== 响应式设计 ========== */
+    @media screen and (max-width: 992px) {
+        .chat-sidebar { width: 240px; min-width: 240px; }
+    }
+    @media screen and (max-width: 768px) {
+        .chat-wrapper { height: calc(100vh - 120px); border-radius: 0; }
+        .chat-sidebar {
+            position: fixed;
+            left: -280px;
+            top: 0;
+            bottom: 0;
+            width: 280px;
+            z-index: 1000;
+            transition: left 0.3s ease;
+        }
+        .chat-sidebar.show { left: 0; }
+        .sidebar-toggle { display: flex; }
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        .sidebar-overlay.show { display: block; }
+        .msg-content-wrapper { max-width: 80%; }
+        .emoji-picker { width: 280px; left: 5px; }
+        .emoji-picker-body { grid-template-columns: repeat(7, 1fr); }
+    }
+    @media screen and (max-width: 480px) {
+        .chat-header { padding: 0 10px; }
+        .chat-messages { padding: 10px; }
+        .chat-input-wrapper { padding: 10px; }
+        .msg-content-wrapper { max-width: 85%; }
+        .user-item { padding: 10px 15px; }
+    }
+</style>
+
+<!-- 侧边栏遮罩层（移动端） -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- 移动端侧边栏切换按钮 -->
+<div class="sidebar-toggle" id="sidebarToggle">
+    <i class="layui-icon layui-icon-spread-left"></i>
+</div>
+
+<div class="chat-wrapper">
+    <div class="chat-container">
+        <!-- 侧边栏 -->
+        <div class="chat-sidebar" id="chatSidebar">
+            <div class="sidebar-header">
+                <h3><i class="layui-icon layui-icon-dialogue"></i> 消息</h3>
+                <div class="chat-search">
+                    <i class="layui-icon layui-icon-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索联系人...">
+                </div>
+            </div>
+            <div class="user-list" id="userList">
+                <div class="user-item active" data-id="0">
+                    <div class="user-avatar online" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="layui-icon layui-icon-group" style="font-size: 18px;"></i>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">群聊大厅</div>
+                        <div class="user-status">{{ users|length + 1 }} 人在线</div>
+                    </div>
+                </div>
+                {% for u in users %}
+                <div class="user-item" data-id="{{ u.id }}" data-name="{{ u.username }}">
+                    <div class="user-avatar online" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        {{ u.username[0]|upper }}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">{{ u.username }}</div>
+                        <div class="user-status">在线</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- 聊天主区域 -->
+        <div class="chat-main">
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <h4 id="chatTitle">群聊大厅</h4>
+                    <span id="chatSubtitle">{{ users|length + 1 }} 人在线</span>
+                </div>
+                <div class="chat-header-actions">
+                    <i class="layui-icon layui-icon-search" title="搜索记录"></i>
+                    <i class="layui-icon layui-icon-more-vertical" title="更多"></i>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="msgBox">
+                <!-- 消息内容 -->
+            </div>
+            
+            <div class="chat-input-area">
+                <!-- 上传预览区域 -->
+                <div class="upload-preview" id="uploadPreview" style="display: none;">
+                    <div class="preview-content" id="previewContent"></div>
+                    <div class="preview-close" id="previewClose">
+                        <i class="layui-icon layui-icon-close"></i>
+                    </div>
+                </div>
+                
+                <div class="chat-toolbar">
+                    <div class="toolbar-btn" id="emojiBtn" title="表情">
+                        <i class="layui-icon layui-icon-face-smile"></i>
+                    </div>
+                    <div class="toolbar-btn" id="imageBtn" title="发送图片">
+                        <i class="layui-icon layui-icon-picture"></i>
+                    </div>
+                    <div class="toolbar-btn" id="fileBtn" title="发送文件">
+                        <i class="layui-icon layui-icon-file"></i>
+                    </div>
+                    
+                    <!-- 隐藏的文件输入框 -->
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,.mp3,.mp4,.avi,.mov,.png,.jpg,.jpeg,.gif,.webp,.bmp" style="display: none;">
+                    
+                    <!-- Emoji 选择器 -->
+                    <div class="emoji-picker" id="emojiPicker">
+                        <div class="emoji-picker-header">表情</div>
+                        <div class="emoji-picker-body" id="emojiList">
+                            <!-- Emoji 列表由 JS 生成 -->
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-wrapper">
+                    <textarea class="chat-input" id="msgInput" placeholder="输入消息，按 Enter 发送..."></textarea>
+                    <button class="chat-send-btn" id="sendBtn">
+                        <i class="layui-icon layui-icon-top"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片预览弹窗 -->
+<div class="image-preview-modal" id="imagePreviewModal">
+    <img src="" alt="预览图片" id="previewModalImage">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+// 初始化 Layui layer 模块
+layui.use(['layer'], function(){
+    var layer = layui.layer;
+    window.layer = layer; // 暴露到全局
+});
+
+$(function() {
+    // ========== 配置 ==========
+    var socket = io();
+    var currentTargetId = 0;
+    var myId = {{ current_user.id }};
+    var myName = "{{ current_user.username }}";
+    var pendingUpload = null; // 待发送的文件信息
+    
+    // 简单的消息提示函数（兼容 layer 未加载的情况）
+    function showMsg(msg, type) {
+        if (window.layer) {
+            layer.msg(msg, {icon: type === 'error' ? 2 : 1});
+        } else {
+            alert(msg);
+        }
+    }
+    
+    function showLoading() {
+        if (window.layer) {
+            return layer.load(1, {shade: [0.3, '#000']});
+        }
+        return null;
+    }
+    
+    function closeLoading(index) {
+        if (window.layer && index) {
+            layer.close(index);
+        }
+    }
+    
+    // 常用 Emoji 列表
+    var emojis = [
+        '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+        '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘',
+        '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭',
+        '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏',
+        '😒', '🙄', '😬', '😮', '😯', '😲', '😳', '🥺',
+        '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱',
+        '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
+        '😡', '😠', '🤬', '👍', '👎', '👏', '🙌', '🤝',
+        '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💯',
+        '✨', '🔥', '💪', '👀', '🎉', '🎊', '💐', '🌹'
+    ];
+    
+    // ========== 工具函数 ==========
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    function getFileIconClass(filename) {
+        var ext = filename.split('.').pop().toLowerCase();
+        if (['pdf'].includes(ext)) return 'pdf';
+        if (['doc', 'docx'].includes(ext)) return 'doc';
+        if (['xls', 'xlsx'].includes(ext)) return 'xls';
+        if (['ppt', 'pptx'].includes(ext)) return 'ppt';
+        if (['zip', 'rar', '7z'].includes(ext)) return 'zip';
+        if (['mp3', 'mp4', 'avi', 'mov'].includes(ext)) return 'media';
+        return 'default';
+    }
+    
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // ========== 初始化 Emoji 选择器 ==========
+    var emojiHtml = '';
+    emojis.forEach(function(emoji) {
+        emojiHtml += '<span class="emoji-item">' + emoji + '</span>';
+    });
+    $('#emojiList').html(emojiHtml);
+    
+    // ========== 事件绑定 ==========
+    
+    // Emoji 按钮点击
+    $('#emojiBtn').on('click', function(e) {
+        e.stopPropagation();
+        $('#emojiPicker').toggleClass('show');
+    });
+    
+    // 点击 Emoji 插入
+    $('#emojiList').on('click', '.emoji-item', function() {
+        var emoji = $(this).text();
+        var $input = $('#msgInput');
+        var cursorPos = $input[0].selectionStart;
+        var textBefore = $input.val().substring(0, cursorPos);
+        var textAfter = $input.val().substring(cursorPos);
+        $input.val(textBefore + emoji + textAfter);
+        $input.focus();
+        var newPos = cursorPos + emoji.length;
+        $input[0].setSelectionRange(newPos, newPos);
+    });
+    
+    // 点击其他地方关闭 Emoji 选择器
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#emojiPicker, #emojiBtn').length) {
+            $('#emojiPicker').removeClass('show');
+        }
+    });
+    
+    // ========== 文件上传相关 ==========
+    
+    // 图片按钮点击
+    $('#imageBtn').on('click', function() {
+        $('#imageInput').click();
+    });
+    
+    // 文件按钮点击
+    $('#fileBtn').on('click', function() {
+        $('#fileInput').click();
+    });
+    
+    // 图片选择处理
+    $('#imageInput').on('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+        
+        // 验证文件类型
+        if (!file.type.startsWith('image/')) {
+            showMsg('请选择图片文件', 'error');
+            return;
+        }
+        
+        // 验证文件大小 (20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            showMsg('图片大小不能超过 20MB', 'error');
+            return;
+        }
+        
+        // 显示预览
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            $('#previewContent').html('<img src="' + e.target.result + '" class="preview-image">');
+            $('#uploadPreview').show();
+            pendingUpload = { file: file, type: 'image' };
+        };
+        reader.readAsDataURL(file);
+        
+        // 清空 input 以便重复选择同一文件
+        $(this).val('');
+    });
+    
+    // 文件选择处理
+    $('#fileInput').on('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+        
+        // 验证文件大小 (20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            showMsg('文件大小不能超过 20MB', 'error');
+            return;
+        }
+        
+        // 显示预览
+        var iconClass = getFileIconClass(file.name);
+        var previewHtml = '<div class="preview-file">' +
+            '<div class="preview-file-icon"><i class="layui-icon layui-icon-file"></i></div>' +
+            '<div class="preview-file-info">' +
+                '<div class="preview-file-name">' + escapeHtml(file.name) + '</div>' +
+                '<div class="preview-file-size">' + formatFileSize(file.size) + '</div>' +
+            '</div>' +
+        '</div>';
+        $('#previewContent').html(previewHtml);
+        $('#uploadPreview').show();
+        pendingUpload = { file: file, type: 'file' };
+        
+        $(this).val('');
+    });
+    
+    // 关闭预览
+    $('#previewClose').on('click', function() {
+        $('#uploadPreview').hide();
+        $('#previewContent').empty();
+        pendingUpload = null;
+    });
+    
+    // 上传文件函数
+    function uploadFile(fileData, callback) {
+        var formData = new FormData();
+        formData.append('file', fileData.file);
+        formData.append('type', fileData.type);
+        
+        $.ajax({
+            url: '/chat/upload',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                var xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        var percent = Math.round((e.loaded / e.total) * 100);
+                        // 可以在这里更新进度条
+                    }
+                }, false);
+                return xhr;
+            },
+            success: function(res) {
+                if (res.code === 0) {
+                    callback(null, res.data);
+                } else {
+                    callback(res.msg);
+                }
+            },
+            error: function() {
+                callback('上传失败，请重试');
+            }
+        });
+    }
+    
+    // 用户列表点击
+    $('#userList').on('click', '.user-item', function() {
+        var $this = $(this);
+        var id = parseInt($this.data('id'));
+        var name = id === 0 ? '群聊大厅' : $this.data('name');
+        
+        currentTargetId = id;
+        $('#chatTitle').text(name);
+        $('#chatSubtitle').text(id === 0 ? '{{ users|length + 1 }} 人在线' : '在线');
+        
+        $('.user-item').removeClass('active');
+        $this.addClass('active');
+        
+        // 移动端关闭侧边栏
+        $('#chatSidebar').removeClass('show');
+        $('#sidebarOverlay').removeClass('show');
+        
+        loadHistory(id);
+    });
+    
+    // 发送按钮点击
+    $('#sendBtn').on('click', sendMsg);
+    
+    // Enter 发送，Shift+Enter 换行
+    $('#msgInput').on('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMsg();
+        }
+    });
+    
+    // 搜索联系人
+    $('#searchInput').on('input', function() {
+        var keyword = $(this).val().toLowerCase();
+        $('.user-item').each(function() {
+            var name = $(this).find('.user-name').text().toLowerCase();
+            $(this).toggle(name.indexOf(keyword) > -1);
+        });
+    });
+    
+    // 移动端侧边栏切换
+    $('#sidebarToggle').on('click', function() {
+        $('#chatSidebar').addClass('show');
+        $('#sidebarOverlay').addClass('show');
+    });
+    $('#sidebarOverlay').on('click', function() {
+        $('#chatSidebar').removeClass('show');
+        $(this).removeClass('show');
+    });
+    
+    // 图片预览弹窗
+    $('#msgBox').on('click', '.msg-image', function() {
+        var src = $(this).attr('src');
+        $('#previewModalImage').attr('src', src);
+        $('#imagePreviewModal').addClass('show');
+    });
+    $('#imagePreviewModal').on('click', function() {
+        $(this).removeClass('show');
+    });
+    
+    // 文件下载
+    $('#msgBox').on('click', '.msg-file', function() {
+        var url = $(this).data('url');
+        var filename = $(this).data('filename');
+        if (url) {
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'download';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    });
+    
+    // ========== 音乐播放器控制 ==========
+    var currentPlayingAudio = null;
+    
+    // 格式化时间
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return '0:00';
+        var mins = Math.floor(seconds / 60);
+        var secs = Math.floor(seconds % 60);
+        return mins + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+    
+    // 播放/暂停按钮点击
+    $('#msgBox').on('click', '.music-play-btn', function(e) {
+        e.stopPropagation();
+        var $btn = $(this);
+        var musicId = $btn.data('music-id');
+        var audio = document.getElementById(musicId);
+        
+        if (!audio) return;
+        
+        // 如果有其他音乐在播放，先暂停
+        if (currentPlayingAudio && currentPlayingAudio !== audio) {
+            currentPlayingAudio.pause();
+            var $otherBtn = $('.music-play-btn[data-music-id="' + currentPlayingAudio.id + '"]');
+            $otherBtn.removeClass('playing').find('i').removeClass('layui-icon-pause').addClass('layui-icon-play');
+        }
+        
+        if (audio.paused) {
+            audio.play().then(function() {
+                $btn.addClass('playing').find('i').removeClass('layui-icon-play').addClass('layui-icon-pause');
+                currentPlayingAudio = audio;
+            }).catch(function(err) {
+                console.error('播放失败:', err);
+                showMsg('播放失败，请稍后重试', 'error');
+            });
+        } else {
+            audio.pause();
+            $btn.removeClass('playing').find('i').removeClass('layui-icon-pause').addClass('layui-icon-play');
+        }
+    });
+    
+    // 进度条点击跳转
+    $('#msgBox').on('click', '.music-progress-bar', function(e) {
+        var $bar = $(this);
+        var musicId = $bar.data('music-id');
+        var audio = document.getElementById(musicId);
+        
+        if (!audio || isNaN(audio.duration)) return;
+        
+        var rect = this.getBoundingClientRect();
+        var clickX = e.clientX - rect.left;
+        var percent = clickX / rect.width;
+        audio.currentTime = percent * audio.duration;
+    });
+    
+    // 监听音频事件（使用事件委托）
+    $(document).on('timeupdate', 'audio', function() {
+        var audio = this;
+        var $card = $('.msg-music-card[data-music-id="' + audio.id + '"]');
+        if ($card.length === 0) return;
+        
+        var percent = (audio.currentTime / audio.duration) * 100;
+        $card.find('.music-progress-fill').css('width', percent + '%');
+        $card.find('.music-current-time').text(formatTime(audio.currentTime));
+    });
+    
+    $(document).on('loadedmetadata', 'audio', function() {
+        var audio = this;
+        var $card = $('.msg-music-card[data-music-id="' + audio.id + '"]');
+        if ($card.length === 0) return;
+        
+        $card.find('.music-duration').text(formatTime(audio.duration));
+    });
+    
+    $(document).on('ended', 'audio', function() {
+        var audio = this;
+        var $btn = $('.music-play-btn[data-music-id="' + audio.id + '"]');
+        $btn.removeClass('playing').find('i').removeClass('layui-icon-pause').addClass('layui-icon-play');
+        
+        var $card = $('.msg-music-card[data-music-id="' + audio.id + '"]');
+        $card.find('.music-progress-fill').css('width', '0%');
+        $card.find('.music-current-time').text('0:00');
+    });
+    
+    // ========== 消息处理函数 ==========
+    
+    function loadHistory(targetId) {
+        $.getJSON('/chat/history', { target_id: targetId }, function(res) {
+            if (res.code === 0) {
+                $('#msgBox').empty();
+                res.data.forEach(function(msg) {
+                    appendMsg(msg, false);
+                });
+                scrollToBottom();
+            }
+        });
+    }
+    
+    function appendMsg(msg, animate) {
+        var isSelf = (msg.sender_id === myId);
+        var timeStr = msg.created_at ? msg.created_at.split(' ')[1].substring(0, 5) : '';
+        var avatarColors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+        ];
+        var colorIndex = msg.sender_id % avatarColors.length;
+        
+        // 根据消息类型生成内容
+        var contentHtml = '';
+        var msgType = msg.msg_type || 'text';
+        
+        if (msgType === 'image') {
+            contentHtml = '<img src="' + msg.content + '" class="msg-image" alt="图片">';
+        } else if (msgType === 'file') {
+            var fileName = msg.file_name || '文件';
+            var fileSize = msg.file_size ? formatFileSize(msg.file_size) : '';
+            var iconClass = getFileIconClass(fileName);
+            contentHtml = '<div class="msg-file" data-url="' + msg.content + '" data-filename="' + escapeHtml(fileName) + '">' +
+                '<div class="msg-file-icon ' + iconClass + '"><i class="layui-icon layui-icon-file"></i></div>' +
+                '<div class="msg-file-info">' +
+                    '<div class="msg-file-name">' + escapeHtml(fileName) + '</div>' +
+                    '<div class="msg-file-size">' + fileSize + '</div>' +
+                '</div>' +
+                '<i class="layui-icon layui-icon-download-circle msg-file-download"></i>' +
+            '</div>';
+        } else if (msgType === 'music') {
+            // 解析音乐数据
+            try {
+                var musicData = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                var musicId = 'music_' + msg.id + '_' + Date.now();
+                var singerName = musicData.singer || '未知歌手';
+                contentHtml = '<div class="msg-music-card" data-music-id="' + musicId + '">' +
+                    '<div class="music-card-header">' +
+                        '<img src="' + (musicData.cover || '/static/images/music-default.png') + '" class="music-card-cover" onerror="this.src=\'/static/images/music-default.png\'">' +
+                        '<div class="music-card-overlay">' +
+                            '<div class="music-card-title">' + escapeHtml(musicData.name || '未知歌曲') + '</div>' +
+                            '<div class="music-card-singer">' + escapeHtml(singerName) + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="music-card-body">' +
+                        '<div class="music-player">' +
+                            '<div class="music-play-btn" data-url="' + (musicData.url || '') + '" data-music-id="' + musicId + '">' +
+                                '<i class="layui-icon layui-icon-play"></i>' +
+                            '</div>' +
+                            '<div class="music-progress-wrap">' +
+                                '<div class="music-progress-bar" data-music-id="' + musicId + '">' +
+                                    '<div class="music-progress-fill"></div>' +
+                                '</div>' +
+                                '<div class="music-time">' +
+                                    '<span class="music-current-time">0:00</span>' +
+                                    '<span class="music-duration">0:00</span>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="music-card-footer">' +
+                        '<div class="music-card-tag"><i class="layui-icon layui-icon-headset"></i> 曼波推荐</div>' +
+                    '</div>' +
+                    '<audio id="' + musicId + '" src="' + (musicData.url || '') + '" preload="metadata"></audio>' +
+                '</div>';
+            } catch (e) {
+                contentHtml = '<div class="msg-bubble">音乐加载失败</div>';
+            }
+        } else if (msgType === 'movie') {
+            // 解析电影数据
+            try {
+                var movieData = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                var movieId = 'movie_' + msg.id + '_' + Date.now();
+                contentHtml = '<div class="msg-movie-card" data-movie-id="' + movieId + '">' +
+                    '<div class="movie-card-header">' +
+                        '<div class="movie-card-title">' +
+                            '<i class="layui-icon layui-icon-video"></i>' +
+                            '<span>视频播放</span>' +
+                        '</div>' +
+                        '<div class="movie-card-actions">' +
+                            '<i class="layui-icon layui-icon-refresh-1" title="刷新" onclick="document.getElementById(\'' + movieId + '\').src=document.getElementById(\'' + movieId + '\').src"></i>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="movie-card-body">' +
+                        '<iframe id="' + movieId + '" src="' + movieData.iframe_src + '" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>' +
+                    '</div>' +
+                    '<div class="movie-card-footer">' +
+                        '<div class="movie-card-tag"><i class="layui-icon layui-icon-play"></i> 曼波解析</div>' +
+                        '<button class="movie-fullscreen-btn" onclick="document.getElementById(\'' + movieId + '\').requestFullscreen()"><i class="layui-icon layui-icon-screen-full"></i> 全屏</button>' +
+                    '</div>' +
+                '</div>';
+            } catch (e) {
+                contentHtml = '<div class="msg-bubble">视频加载失败</div>';
+            }
+        } else if (msgType === 'weather') {
+            // 解析天气数据
+            try {
+                var weatherData = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                var now = weatherData.now || {};
+                var daily = weatherData.daily || [];
+                // 使用 wttr.in 的天气图标
+                var weatherIconUrl = 'https://wttr.in/static/png/' + (now.icon || '113') + '.png';
+                
+                // 格式化日期显示
+                function formatWeatherDate(dateStr) {
+                    if (!dateStr) return '';
+                    var date = new Date(dateStr);
+                    var today = new Date();
+                    var tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    
+                    if (date.toDateString() === today.toDateString()) return '今天';
+                    if (date.toDateString() === tomorrow.toDateString()) return '明天';
+                    return (date.getMonth() + 1) + '/' + date.getDate();
+                }
+                
+                var forecastHtml = '';
+                daily.forEach(function(day) {
+                    var dayIconUrl = 'https://wttr.in/static/png/' + (day.iconDay || '113') + '.png';
+                    forecastHtml += '<div class="weather-forecast-item">' +
+                        '<div class="date">' + formatWeatherDate(day.date) + '</div>' +
+                        '<div class="icon"><img src="' + dayIconUrl + '" alt=""></div>' +
+                        '<div class="temp"><span class="high">' + day.tempMax + '°</span> / <span class="low">' + day.tempMin + '°</span></div>' +
+                        '<div class="text">' + day.textDay + '</div>' +
+                    '</div>';
+                });
+                
+                contentHtml = '<div class="msg-weather-card">' +
+                    '<div class="weather-card-header">' +
+                        '<div class="weather-location">' +
+                            '<i class="layui-icon layui-icon-location"></i>' +
+                            '<span>' + escapeHtml(weatherData.city || '未知') + (weatherData.adm ? ', ' + escapeHtml(weatherData.adm) : '') + '</span>' +
+                        '</div>' +
+                        '<div class="weather-now">' +
+                            '<div class="weather-temp-wrap">' +
+                                '<div class="weather-temp">' + (now.temp || '--') + '<sup>°C</sup></div>' +
+                                '<div class="weather-text">' + (now.text || '--') + '</div>' +
+                            '</div>' +
+                            '<div class="weather-icon"><img src="' + weatherIconUrl + '" alt=""></div>' +
+                        '</div>' +
+                        '<div class="weather-details">' +
+                            '<div class="weather-detail-item"><div class="label">体感</div><div class="value">' + (now.feelsLike || '--') + '°</div></div>' +
+                            '<div class="weather-detail-item"><div class="label">湿度</div><div class="value">' + (now.humidity || '--') + '%</div></div>' +
+                            '<div class="weather-detail-item"><div class="label">风向</div><div class="value">' + (now.windDir || '--') + '</div></div>' +
+                            '<div class="weather-detail-item"><div class="label">风力</div><div class="value">' + (now.windScale || '--') + '级</div></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="weather-forecast">' +
+                        '<div class="weather-forecast-title"><i class="layui-icon layui-icon-date"></i> 未来三天</div>' +
+                        '<div class="weather-forecast-list">' + forecastHtml + '</div>' +
+                    '</div>' +
+                    '<div class="weather-card-footer">' +
+                        '<span><i class="layui-icon layui-icon-about"></i>数据来源：和风天气</span>' +
+                        '<span>曼波为您查询</span>' +
+                    '</div>' +
+                '</div>';
+            } catch (e) {
+                contentHtml = '<div class="msg-bubble">天气数据加载失败</div>';
+            }
+        } else {
+            contentHtml = '<div class="msg-bubble">' + escapeHtml(msg.content) + '</div>';
+        }
+        
+        var html = '<div class="msg-item ' + (isSelf ? 'self' : '') + '">' +
+            '<div class="msg-avatar-wrap">' +
+                '<div class="msg-avatar" style="background: ' + avatarColors[colorIndex] + ';">' + 
+                    (msg.sender_name ? msg.sender_name[0].toUpperCase() : '?') + 
+                '</div>' +
+            '</div>' +
+            '<div class="msg-content-wrapper">' +
+                '<div class="msg-name">' +
+                    '<span>' + msg.sender_name + '</span>' +
+                    '<span class="time">' + timeStr + '</span>' +
+                '</div>' +
+                contentHtml +
+            '</div>' +
+        '</div>';
+        
+        $('#msgBox').append(html);
+    }
+    
+    function scrollToBottom() {
+        var $box = $('#msgBox');
+        $box.scrollTop($box[0].scrollHeight);
+    }
+    
+    function sendMsg() {
+        // 如果有待上传的文件
+        if (pendingUpload) {
+            var loadIndex = showLoading();
+            uploadFile(pendingUpload, function(err, data) {
+                closeLoading(loadIndex);
+                if (err) {
+                    showMsg(err, 'error');
+                    return;
+                }
+                
+                // 发送文件消息
+                socket.emit('send_message', {
+                    content: data.url,
+                    receiver_id: currentTargetId === 0 ? null : currentTargetId,
+                    msg_type: data.type,
+                    file_name: data.filename,
+                    file_size: data.size
+                });
+                
+                // 清除预览
+                $('#uploadPreview').hide();
+                $('#previewContent').empty();
+                pendingUpload = null;
+            });
+            return;
+        }
+        
+        // 发送文本消息
+        var $input = $('#msgInput');
+        var content = $input.val().trim();
+        if (!content) return;
+        
+        socket.emit('send_message', {
+            content: content,
+            receiver_id: currentTargetId === 0 ? null : currentTargetId,
+            msg_type: 'text'
+        });
+        
+        $input.val('').focus();
+    }
+    
+    // ========== Socket 事件 ==========
+    
+    socket.on('connect', function() {
+        console.log('WebSocket 已连接');
+    });
+    
+    socket.on('new_message', function(msg) {
+        var show = false;
+        if (currentTargetId === 0) {
+            if (!msg.receiver_id) show = true;
+        } else {
+            if ((msg.sender_id === currentTargetId && msg.receiver_id === myId) ||
+                (msg.sender_id === myId && msg.receiver_id === currentTargetId)) {
+                show = true;
+            }
+        }
+        
+        if (show) {
+            appendMsg(msg, true);
+            scrollToBottom();
+        }
+    });
+
+    // AI 开始输入/思考
+    socket.on('ai_typing_start', function(data) {
+        if (currentTargetId !== 0) return; // 仅在群聊显示
+        
+        var avatarColors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+        ];
+        var colorIndex = data.sender_id % avatarColors.length;
+        
+        var html = '<div class="msg-item" id="' + data.temp_id + '">' +
+            '<div class="msg-avatar-wrap">' +
+                '<div class="msg-avatar" style="background: ' + avatarColors[colorIndex] + ';">' + 
+                    (data.sender_name ? data.sender_name[0].toUpperCase() : '?') + 
+                '</div>' +
+            '</div>' +
+            '<div class="msg-content-wrapper">' +
+                '<div class="msg-name">' +
+                    '<span>' + data.sender_name + '</span>' +
+                    '<span class="time">正在思考...</span>' +
+                '</div>' +
+                '<div class="msg-bubble ai-typing">...</div>' +
+            '</div>' +
+        '</div>';
+        
+        $('#msgBox').append(html);
+        scrollToBottom();
+    });
+
+    // AI 响应片段
+    socket.on('ai_message_chunk', function(data) {
+        if (currentTargetId !== 0) return;
+        
+        var $msg = $('#' + data.temp_id);
+        if ($msg.length > 0) {
+            var $bubble = $msg.find('.msg-bubble');
+            var $time = $msg.find('.time');
+            
+            // 如果是第一次收到 chunk，清除 "..."
+            if ($bubble.hasClass('ai-typing')) {
+                $bubble.removeClass('ai-typing').empty();
+                $time.text('刚刚');
+            }
+            
+            // 追加内容（简单处理，如果需要 markdown 可以在这里解析）
+            // 注意：这里我们简单地将文本转义后追加，如果已经是 html 则直接追加
+            // 由于 chunk 是纯文本，我们先 append text
+            var currentText = $bubble.text();
+            $bubble.text(currentText + data.chunk);
+            
+            scrollToBottom();
+        }
+    });
+
+    // AI 响应结束
+    socket.on('ai_message_end', function(data) {
+        if (currentTargetId !== 0) return;
+        
+        var $msg = $('#' + data.temp_id);
+        if ($msg.length > 0) {
+            // 可以在这里移除 temp_id 或者替换为真实的 message id
+            // 但为了简单，我们就不替换了，因为页面刷新后会加载真实的历史记录
+            $msg.removeAttr('id'); // 移除 id 防止冲突
+        }
+    });
+    
+    // ========== 初始化 ==========
+    loadHistory(0);
+});
+</script>
+{% endblock %}

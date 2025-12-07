@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据可视化大屏 - 智能分析平台</title>
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- ECharts GL for 3D -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
+    <!-- China Map -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/js/china.js"></script>
+    <!-- jQuery -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: #0a0e27;
+            color: #fff;
+            overflow: hidden;
+            min-height: 100vh;
+        }
+        
+        /* ========== 背景动画 ========== */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 10% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.05) 0%, transparent 70%),
+                linear-gradient(180deg, #0a0e27 0%, #111936 100%);
+        }
+        
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.3), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.4), transparent),
+                radial-gradient(2px 2px at 130px 80px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(1px 1px at 160px 120px, rgba(255,255,255,0.3), transparent);
+            background-size: 200px 200px;
+            animation: twinkle 5s ease-in-out infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        /* ========== 主容器 ========== */
+        .dashboard-container {
+            width: 100vw;
+            height: 100vh;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* ========== 头部 ========== */
+        .dashboard-header {
+            height: 80px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(59, 130, 246, 0.3) 15%, 
+                rgba(59, 130, 246, 0.5) 50%, 
+                rgba(59, 130, 246, 0.3) 85%, 
+                transparent 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .dashboard-header::before,
+        .dashboard-header::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 30%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        }
+        
+        .dashboard-header::before { left: 2%; }
+        .dashboard-header::after { right: 2%; }
+        
+        .header-title {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            background: linear-gradient(180deg, #fff 0%, #93c5fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+        }
+        
+        .header-time {
+            position: absolute;
+            right: 30px;
+            font-size: 18px;
+            color: #93c5fd;
+            font-family: 'Consolas', monospace;
+        }
+        
+        .header-date {
+            position: absolute;
+            left: 30px;
+            font-size: 16px;
+            color: #93c5fd;
+        }
+        
+        /* ========== 主体内容 ========== */
+        .dashboard-body {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 15px;
+            min-height: 0;
+        }
+        
+        /* ========== 面板通用样式 ========== */
+        .panel {
+            background: linear-gradient(180deg, 
+                rgba(30, 41, 82, 0.8) 0%, 
+                rgba(20, 27, 55, 0.9) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        }
+        
+        .panel-header {
+            height: 40px;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(59, 130, 246, 0.1);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .panel-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .panel-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #93c5fd;
+            letter-spacing: 2px;
+        }
+        
+        .panel-body {
+            flex: 1;
+            padding: 10px;
+            min-height: 0;
+            position: relative;
+        }
+        
+        /* ========== 左侧面板 ========== */
+        .left-panels {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* ========== 中间面板 ========== */
+        .center-panels {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .center-top {
+            flex: 2;
+        }
+        
+        .center-bottom {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        /* ========== 右侧面板 ========== */
+        .right-panels {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* ========== 图表容器 ========== */
+        .chart-container {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* ========== 数据列表 ========== */
+        .data-list {
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .data-list-header {
+            display: grid;
+            grid-template-columns: 50px 1fr 100px;
+            padding: 8px 10px;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #93c5fd;
+        }
+        
+        .data-list-body {
+            height: calc(100% - 40px);
+            overflow: hidden;
+        }
+        
+        .data-list-scroll {
+            animation: scrollUp 20s linear infinite;
+        }
+        
+        @keyframes scrollUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+        
+        .data-list-item {
+            display: grid;
+            grid-template-columns: 50px 1fr 100px;
+            padding: 10px;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+        
+        .data-list-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .data-list-item .rank {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .data-list-item .rank.top1 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .data-list-item .rank.top2 { background: linear-gradient(135deg, #94a3b8, #64748b); }
+        .data-list-item .rank.top3 { background: linear-gradient(135deg, #cd7f32, #a0522d); }
+        .data-list-item .rank.normal { background: rgba(59, 130, 246, 0.3); }
+        
+        .data-list-item .title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 10px;
+            color: #e2e8f0;
+        }
+        
+        .data-list-item .time {
+            color: #64748b;
+            font-size: 12px;
+        }
+        
+        /* ========== 统计卡片 ========== */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            height: 100%;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.2) 0%, 
+                rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+        }
+        
+        .stat-card .label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-card .trend {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .stat-card .trend.up { color: #10b981; }
+        .stat-card .trend.down { color: #ef4444; }
+        
+        /* ========== AI 分析面板 ========== */
+        .ai-analysis {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .ai-input-wrap {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .ai-input {
+            flex: 1;
+            background: rgba(30, 41, 82, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 6px;
+            padding: 10px 15px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .ai-input:focus {
+            border-color: #3b82f6;
+        }
+        
+        .ai-input::placeholder {
+            color: #64748b;
+        }
+        
+        .ai-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        
+        .ai-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .ai-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .ai-result {
+            flex: 1;
+            background: rgba(20, 27, 55, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 6px;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #e2e8f0;
+            white-space: pre-wrap; /* 保留换行和缩进 */
+        }
+        
+        .ai-result::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .ai-result::-webkit-scrollbar-track {
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 3px;
+        }
+        
+        .ai-result::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.3);
+            border-radius: 3px;
+        }
+        
+        .ai-typing {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #3b82f6;
+            animation: blink 1s infinite;
+            margin-left: 2px;
+            vertical-align: middle;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        /* ========== 3D 地球容器 ========== */
+        .globe-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .globe-stats {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .globe-stat-item {
+            text-align: center;
+        }
+        
+        .globe-stat-item .label {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        
+        .globe-stat-item .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        
+        /* ========== 加载动画 ========== */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #64748b;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ========== 响应式 ========== */
+        @media screen and (max-width: 1600px) {
+            .header-title { font-size: 28px; letter-spacing: 6px; }
+            .stat-card .value { font-size: 24px; }
+        }
+        
+        @media screen and (max-width: 1400px) {
+            .dashboard-body {
+                grid-template-columns: 1fr 1.2fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <div class="dashboard-container">
+        <!-- 头部 -->
+        <header class="dashboard-header">
+            <div class="header-date" id="headerDate">2025年12月06日 星期六</div>
+            <h1 class="header-title">智能数据可视化分析平台</h1>
+            <div class="header-time" id="headerTime">21:00:00</div>
+        </header>
+        
+        <!-- 主体 -->
+        <main class="dashboard-body">
+            <!-- 左侧面板 -->
+            <div class="left-panels">
+                <!-- 数据统计 -->
+                <div class="panel" style="flex: 0.8;">
+                    <div class="panel-header">
+                        <div class="panel-icon">📊</div>
+                        <span class="panel-title">数据概览</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="stat-cards">
+                            <div class="stat-card">
+                                <div class="label">数据总量</div>
+                                <div class="value" id="statTotal">0</div>
+                                <div class="trend up">↑ 12.5%</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="label">今日新增</div>
+                                <div class="value" id="statToday">0</div>
+                                <div class="trend up">↑ 8.3%</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="label">活跃来源</div>
+                                <div class="value" id="statSources">0</div>
+                                <div class="trend down">↓ 2.1%</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="label">分析任务</div>
+                                <div class="value" id="statTasks">0</div>
+                                <div class="trend up">↑ 15.7%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 饼图 -->
+                <div class="panel" style="flex: 1;">
+                    <div class="panel-header">
+                        <div class="panel-icon">🥧</div>
+                        <span class="panel-title">数据分类占比</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="pieChart" class="chart-container"></div>
+                    </div>
+                </div>
+                
+                <!-- 柱状图 -->
+                <div class="panel" style="flex: 1;">
+                    <div class="panel-header">
+                        <div class="panel-icon">📈</div>
+                        <span class="panel-title">近7日数据趋势</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="barChart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间面板 -->
+            <div class="center-panels">
+                <!-- 地图 -->
+                <div class="panel center-top">
+                    <div class="panel-header">
+                        <div class="panel-icon">🗺️</div>
+                        <span class="panel-title">全国数据热力分布</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="mapChart" class="chart-container"></div>
+                    </div>
+                </div>
+                
+                <!-- 底部两个图表 -->
+                <div class="center-bottom">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-icon">📉</div>
+                            <span class="panel-title">实时数据流</span>
+                        </div>
+                        <div class="panel-body">
+                            <div id="lineChart" class="chart-container"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-icon">🎯</div>
+                            <span class="panel-title">关键指标雷达</span>
+                        </div>
+                        <div class="panel-body">
+                            <div id="radarChart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧面板 -->
+            <div class="right-panels">
+                <!-- 3D 地球 -->
+                <div class="panel" style="flex: 1.2;">
+                    <div class="panel-header">
+                        <div class="panel-icon">🌍</div>
+                        <span class="panel-title">全球数据分布</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="globe-container">
+                            <div id="globeChart" class="chart-container"></div>
+                            <div class="globe-stats">
+                                <div class="globe-stat-item">
+                                    <div class="label">覆盖国家</div>
+                                    <div class="value">32</div>
+                                </div>
+                                <div class="globe-stat-item">
+                                    <div class="label">数据节点</div>
+                                    <div class="value">156</div>
+                                </div>
+                                <div class="globe-stat-item">
+                                    <div class="label">实时连接</div>
+                                    <div class="value">89</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 数据列表 -->
+                <div class="panel" style="flex: 0.8;">
+                    <div class="panel-header">
+                        <div class="panel-icon">📋</div>
+                        <span class="panel-title">最新数据动态</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="data-list">
+                            <div class="data-list-header">
+                                <span>排名</span>
+                                <span>标题</span>
+                                <span>时间</span>
+                            </div>
+                            <div class="data-list-body">
+                                <div class="data-list-scroll" id="dataListScroll">
+                                    <!-- 动态填充 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI 分析 -->
+                <div class="panel" style="flex: 1;">
+                    <div class="panel-header">
+                        <div class="panel-icon">🤖</div>
+                        <span class="panel-title">AI 智能分析</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="ai-analysis">
+                            <div class="ai-input-wrap">
+                                <input type="text" class="ai-input" id="aiInput" placeholder="输入分析问题，如：分析最近数据趋势...">
+                                <button class="ai-btn" id="aiBtn" onclick="startAIAnalysis()">分析</button>
+                                <button class="ai-btn" id="aiSaveBtn" onclick="saveAnalysisReport()" style="display:none; margin-left:10px; background-color: #10b981;">保存</button>
+                            </div>
+                            <div class="ai-result" id="aiResult">
+                                <div style="color: #64748b; text-align: center; padding-top: 20px;">
+                                    💡 输入问题开始 AI 智能分析<br>
+                                    <small>支持数据趋势分析、异常检测、预测建议等</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // ========== 全局变量 ==========
+        let mapChart, pieChart, barChart, lineChart, radarChart, globeChart;
+        let latestData = [];
+        
+        // ========== 初始化 ==========
+        $(document).ready(function() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            initCharts();
+            loadData();
+            
+            // 定时刷新数据
+            setInterval(loadData, 60000);
+            
+            // 窗口大小变化时重绘图表
+            $(window).resize(function() {
+                mapChart && mapChart.resize();
+                pieChart && pieChart.resize();
+                barChart && barChart.resize();
+                lineChart && lineChart.resize();
+                radarChart && radarChart.resize();
+                globeChart && globeChart.resize();
+            });
+            
+            // AI 输入框回车事件
+            $('#aiInput').keypress(function(e) {
+                if (e.which === 13) {
+                    startAIAnalysis();
+                }
+            });
+        });
+        
+        // ========== 更新时间 ==========
+        function updateDateTime() {
+            const now = new Date();
+            const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            
+            $('#headerDate').text(
+                now.getFullYear() + '年' + 
+                (now.getMonth() + 1).toString().padStart(2, '0') + '月' + 
+                now.getDate().toString().padStart(2, '0') + '日 ' + 
+                days[now.getDay()]
+            );
+            
+            $('#headerTime').text(
+                now.getHours().toString().padStart(2, '0') + ':' +
+                now.getMinutes().toString().padStart(2, '0') + ':' +
+                now.getSeconds().toString().padStart(2, '0')
+            );
+        }
+        
+        // ========== 初始化图表 ==========
+        function initCharts() {
+            // 中国地图
+            mapChart = echarts.init(document.getElementById('mapChart'));
+            initMapChart();
+            
+            // 饼图
+            pieChart = echarts.init(document.getElementById('pieChart'));
+            initPieChart();
+            
+            // 柱状图
+            barChart = echarts.init(document.getElementById('barChart'));
+            initBarChart();
+            
+            // 折线图
+            lineChart = echarts.init(document.getElementById('lineChart'));
+            initLineChart();
+            
+            // 雷达图
+            radarChart = echarts.init(document.getElementById('radarChart'));
+            initRadarChart();
+            
+            // 3D 地球
+            globeChart = echarts.init(document.getElementById('globeChart'));
+            initGlobeChart();
+        }
+        
+        // ========== 中国地图 ==========
+        function initMapChart() {
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(20, 27, 55, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: { color: '#fff' },
+                    formatter: function(params) {
+                        if (params.data) {
+                            let keywords = params.data.keywords ? params.data.keywords.join(', ') : '';
+                            return `<strong>${params.name}</strong><br/>数据量: ${params.value || 0}<br/>热词: ${keywords}`;
+                        }
+                        return params.name;
+                    }
+                },
+                visualMap: {
+                    min: 0,
+                    max: 100,
+                    left: 'left',
+                    top: 'bottom',
+                    text: ['高', '低'],
+                    textStyle: { color: '#94a3b8' },
+                    inRange: {
+                        color: ['#1e3a5f', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd']
+                    },
+                    calculable: true
+                },
+                geo: {
+                    map: 'china',
+                    roam: true,
+                    zoom: 1.2,
+                    label: {
+                        show: false
+                    },
+                    itemStyle: {
+                        areaColor: '#1e3a5f',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            areaColor: '#2563eb',
+                            shadowBlur: 20,
+                            shadowColor: 'rgba(59, 130, 246, 0.5)'
+                        },
+                        label: {
+                            show: true,
+                            color: '#fff'
+                        }
+                    }
+                },
+                series: [{
+                    name: '数据分布',
+                    type: 'map',
+                    map: 'china',
+                    geoIndex: 0,
+                    data: []
+                }, {
+                    name: '热点',
+                    type: 'effectScatter',
+                    coordinateSystem: 'geo',
+                    data: [],
+                    symbolSize: function(val) {
+                        return Math.max(val[2] / 5, 8);
+                    },
+                    rippleEffect: {
+                        brushType: 'stroke',
+                        scale: 4
+                    },
+                    itemStyle: {
+                        color: '#f59e0b',
+                        shadowBlur: 10,
+                        shadowColor: '#f59e0b'
+                    }
+                }]
+            };
+            mapChart.setOption(option);
+        }
+        
+        // ========== 饼图 ==========
+        function initPieChart() {
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(20, 27, 55, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: { color: '#fff' }
+                },
+                legend: {
+                    orient: 'vertical',
+                    right: 10,
+                    top: 'center',
+                    textStyle: { color: '#94a3b8', fontSize: 11 }
+                },
+                series: [{
+                    name: '数据分类',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    center: ['40%', '50%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 8,
+                        borderColor: '#0a0e27',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: false
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            color: '#fff'
+                        },
+                        itemStyle: {
+                            shadowBlur: 20,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    },
+                    data: [
+                        { value: 35, name: '科技资讯', itemStyle: { color: '#3b82f6' } },
+                        { value: 25, name: '财经新闻', itemStyle: { color: '#8b5cf6' } },
+                        { value: 20, name: '社会民生', itemStyle: { color: '#10b981' } },
+                        { value: 12, name: '体育娱乐', itemStyle: { color: '#f59e0b' } },
+                        { value: 8, name: '其他', itemStyle: { color: '#64748b' } }
+                    ]
+                }]
+            };
+            pieChart.setOption(option);
+        }
+        
+        // ========== 柱状图 ==========
+        function initBarChart() {
+            const days = [];
+            const values = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                days.push((d.getMonth() + 1) + '/' + d.getDate());
+                values.push(Math.floor(Math.random() * 100) + 50);
+            }
+            
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(20, 27, 55, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: { color: '#fff' }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: days,
+                    axisLine: { lineStyle: { color: '#3b82f6' } },
+                    axisLabel: { color: '#94a3b8', fontSize: 10 }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: { show: false },
+                    splitLine: { lineStyle: { color: 'rgba(59, 130, 246, 0.1)' } },
+                    axisLabel: { color: '#94a3b8', fontSize: 10 }
+                },
+                series: [{
+                    data: values,
+                    type: 'bar',
+                    barWidth: '50%',
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#3b82f6' },
+                            { offset: 1, color: '#1e3a5f' }
+                        ]),
+                        borderRadius: [4, 4, 0, 0]
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: '#60a5fa' },
+                                { offset: 1, color: '#3b82f6' }
+                            ])
+                        }
+                    }
+                }]
+            };
+            barChart.setOption(option);
+        }
+        
+        // ========== 折线图 ==========
+        function initLineChart() {
+            const times = [];
+            const values = [];
+            for (let i = 0; i < 20; i++) {
+                times.push(i + ':00');
+                values.push(Math.floor(Math.random() * 50) + 20);
+            }
+            
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(20, 27, 55, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: { color: '#fff' }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: times,
+                    axisLine: { lineStyle: { color: '#3b82f6' } },
+                    axisLabel: { color: '#94a3b8', fontSize: 9, interval: 3 }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: { show: false },
+                    splitLine: { lineStyle: { color: 'rgba(59, 130, 246, 0.1)' } },
+                    axisLabel: { color: '#94a3b8', fontSize: 10 }
+                },
+                series: [{
+                    data: values,
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: {
+                        color: '#3b82f6',
+                        width: 2
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(59, 130, 246, 0.4)' },
+                            { offset: 1, color: 'rgba(59, 130, 246, 0)' }
+                        ])
+                    }
+                }]
+            };
+            lineChart.setOption(option);
+            
+            // 实时更新
+            setInterval(function() {
+                values.shift();
+                values.push(Math.floor(Math.random() * 50) + 20);
+                lineChart.setOption({
+                    series: [{ data: values }]
+                });
+            }, 2000);
+        }
+        
+        // ========== 雷达图 ==========
+        function initRadarChart() {
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    backgroundColor: 'rgba(20, 27, 55, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: { color: '#fff' }
+                },
+                radar: {
+                    indicator: [
+                        { name: '数据质量', max: 100 },
+                        { name: '更新频率', max: 100 },
+                        { name: '覆盖范围', max: 100 },
+                        { name: '准确性', max: 100 },
+                        { name: '时效性', max: 100 }
+                    ],
+                    shape: 'polygon',
+                    splitNumber: 4,
+                    axisName: {
+                        color: '#94a3b8',
+                        fontSize: 11
+                    },
+                    splitLine: {
+                        lineStyle: { color: 'rgba(59, 130, 246, 0.2)' }
+                    },
+                    splitArea: {
+                        areaStyle: { color: ['rgba(59, 130, 246, 0.05)', 'rgba(59, 130, 246, 0.1)'] }
+                    },
+                    axisLine: {
+                        lineStyle: { color: 'rgba(59, 130, 246, 0.3)' }
+                    }
+                },
+                series: [{
+                    type: 'radar',
+                    data: [{
+                        value: [85, 78, 92, 88, 75],
+                        name: '当前指标',
+                        areaStyle: {
+                            color: 'rgba(59, 130, 246, 0.3)'
+                        },
+                        lineStyle: {
+                            color: '#3b82f6',
+                            width: 2
+                        },
+                        itemStyle: {
+                            color: '#3b82f6'
+                        }
+                    }]
+                }]
+            };
+            radarChart.setOption(option);
+        }
+        
+        // ========== 3D 地球 ==========
+        function initGlobeChart() {
+            const ROOT_PATH = 'https://cdn.jsdelivr.net/gh/apache/echarts-examples@gh-pages';
+            
+            // 加载世界地图数据用于绘制边界线
+            $.getJSON('https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json', function(worldJson) {
+                // 提取边界线数据
+                var linesData = [];
+                worldJson.features.forEach(function(feature) {
+                    if (feature.geometry.type === 'Polygon') {
+                        feature.geometry.coordinates.forEach(function(ring) {
+                            linesData.push({ coords: ring });
+                        });
+                    } else if (feature.geometry.type === 'MultiPolygon') {
+                        feature.geometry.coordinates.forEach(function(polygon) {
+                            polygon.forEach(function(ring) {
+                                linesData.push({ coords: ring });
+                            });
+                        });
+                    }
+                });
+
+                const option = {
+                    backgroundColor: 'transparent',
+                    globe: {
+                        baseTexture: ROOT_PATH + '/data-gl/asset/world.topo.bathy.200401.jpg',
+                        heightTexture: ROOT_PATH + '/data-gl/asset/world.topo.bathy.200401.jpg',
+                        displacementScale: 0.1, // 稍微调小一点位移，让线条贴合更紧密
+                        displacementQuality: 'high',
+                        shading: 'realistic',
+                        environment: ROOT_PATH + '/data-gl/asset/starfield.jpg',
+                        
+                        atmosphere: {
+                            show: true,
+                            offset: 5,
+                            color: '#3b82f6',
+                            glowPower: 1.5,
+                            innerGlowPower: 0.5
+                        },
+                        
+                        realisticMaterial: {
+                            roughness: 0.6
+                        },
+                        
+                        postEffect: {
+                            enable: true,
+                            SSAO: {
+                                enable: true,
+                                radius: 2,
+                                intensity: 1.2
+                            }
+                        },
+                        
+                        light: {
+                            main: {
+                                intensity: 3, // 主光源稍微调低，避免过度曝光
+                                shadow: true
+                            },
+                            ambient: {
+                                intensity: 0.8 // 环境光调高，让纹理更清晰
+                            },
+                            ambientCubemap: {
+                                texture: ROOT_PATH + '/data-gl/asset/pisa.hdr',
+                                diffuseIntensity: 1.0
+                            }
+                        },
+                        
+                        viewControl: {
+                            autoRotate: true,
+                            autoRotateSpeed: 3,
+                            distance: 150, // 拉近距离
+                            targetCoord: [105, 35] // 聚焦中国
+                        }
+                    },
+                    series: [{
+                        type: 'lines3D',
+                        coordinateSystem: 'globe',
+                        effect: {
+                            show: false
+                        },
+                        blendMode: 'lighter',
+                        lineStyle: {
+                            color: '#ffd700', // 金色边界
+                            width: 1,
+                            opacity: 0.6
+                        },
+                        data: linesData,
+                        silent: true // 不响应鼠标事件
+                    }]
+                };
+                globeChart.setOption(option);
+            });
+        }
+        
+        // ========== 加载数据 ==========
+        function loadData() {
+            loadStats();
+            loadPieData();
+            
+            // 加载最新数据
+            $.getJSON('/dashboard/api/latest', function(data) {
+                latestData = data;
+                updateDataList(data);
+            });
+            
+            // 加载热力图数据
+            $.getJSON('/dashboard/api/heatmap', function(data) {
+                updateMapData(data);
+            });
+        }
+        
+        // 加载统计数据
+        function loadStats() {
+            $.getJSON('/dashboard/api/stats', function(data) {
+                animateNumber('statTotal', data.total);
+                animateNumber('statToday', data.today);
+                animateNumber('statSources', data.sources);
+                animateNumber('statTasks', data.tasks);
+            });
+        }
+
+        // 加载饼图数据
+        function loadPieData() {
+            $.getJSON('/dashboard/api/category-stats', function(data) {
+                if (pieChart && data && data.length > 0) {
+                    pieChart.setOption({
+                        series: [{
+                            data: data
+                        }]
+                    });
+                }
+            });
+        }
+        
+        // ========== 更新数据列表 ==========
+        function updateDataList(data) {
+            let html = '';
+            data.forEach(function(item, index) {
+                const rankClass = index < 3 ? 'top' + (index + 1) : 'normal';
+                const time = item.created_at ? item.created_at.split(' ')[1].substring(0, 5) : '--:--';
+                html += `
+                    <div class="data-list-item">
+                        <span class="rank ${rankClass}">${index + 1}</span>
+                        <span class="title" title="${item.title}">${item.title}</span>
+                        <span class="time">${time}</span>
+                    </div>
+                `;
+            });
+            // 复制一份用于无缝滚动
+            html += html;
+            $('#dataListScroll').html(html);
+        }
+        
+        // ========== 数字动画 ==========
+        function animateNumber(id, target) {
+            const el = document.getElementById(id);
+            const start = parseInt(el.textContent) || 0;
+            const duration = 1000;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const current = Math.floor(start + (target - start) * progress);
+                el.textContent = current.toLocaleString();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+        
+        // ========== 更新地图数据 ==========
+        function updateMapData(data) {
+            if (!data || data.length === 0) return;
+            
+            // 省份坐标映射
+            const geoCoord = {
+                '北京': [116.46, 39.92], '天津': [117.2, 39.13], '河北': [114.48, 38.03],
+                '山西': [112.55, 37.87], '内蒙古': [111.65, 40.82], '辽宁': [123.43, 41.8],
+                '吉林': [125.32, 43.9], '黑龙江': [126.53, 45.8], '上海': [121.48, 31.22],
+                '江苏': [118.78, 32.04], '浙江': [120.15, 30.28], '安徽': [117.28, 31.86],
+                '福建': [119.3, 26.08], '江西': [115.89, 28.68], '山东': [117.0, 36.67],
+                '河南': [113.65, 34.76], '湖北': [114.31, 30.52], '湖南': [112.98, 28.19],
+                '广东': [113.26, 23.13], '广西': [108.33, 22.84], '海南': [110.35, 20.02],
+                '重庆': [106.55, 29.57], '四川': [104.07, 30.67], '贵州': [106.71, 26.57],
+                '云南': [102.71, 25.05], '西藏': [91.13, 29.66], '陕西': [108.95, 34.27],
+                '甘肃': [103.82, 36.07], '青海': [101.78, 36.62], '宁夏': [106.27, 38.47],
+                '新疆': [87.62, 43.79], '台湾': [121.5, 25.05], '香港': [114.17, 22.32],
+                '澳门': [113.55, 22.2]
+            };
+            
+            // 更新地图数据
+            const mapData = data.map(item => ({
+                name: item.name,
+                value: item.value,
+                keywords: item.keywords || []
+            }));
+            
+            // 更新散点数据
+            const scatterData = data.filter(item => geoCoord[item.name]).map(item => ({
+                name: item.name,
+                value: [...geoCoord[item.name], item.value]
+            }));
+            
+            mapChart.setOption({
+                series: [
+                    { data: mapData },
+                    { data: scatterData }
+                ]
+            });
+        }
+        
+        // ========== AI 分析 ==========
+        function startAIAnalysis() {
+            const question = $('#aiInput').val().trim();
+            if (!question) {
+                alert('请输入分析问题');
+                return;
+            }
+            
+            const $btn = $('#aiBtn');
+            const $result = $('#aiResult');
+            
+            $btn.prop('disabled', true).text('分析中...');
+            $result.html('<div class="loading"><div class="loading-spinner"></div></div>');
+            
+            // 准备数据摘要
+            const dataSummary = latestData.slice(0, 10).map((item, i) => 
+                `${i + 1}. ${item.title}`
+            ).join('\n');
+            
+            $.ajax({
+                url: '/dashboard/api/ai-analysis',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    question: question,
+                    data_summary: dataSummary
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        // 打字机效果显示结果
+                        typeWriter($result, response.analysis);
+                        
+                        // 显示保存按钮并存储内容
+                        window.currentAnalysisContent = response.analysis;
+                        $('#aiSaveBtn').show();
+                    } else {
+                        $result.html('<div style="color: #ef4444;">分析失败: ' + (response.error || '未知错误') + '</div>');
+                        $('#aiSaveBtn').hide();
+                    }
+                },
+                error: function(xhr) {
+                    $result.html('<div style="color: #ef4444;">请求失败，请稍后重试</div>');
+                    $('#aiSaveBtn').hide();
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('分析');
+                }
+            });
+        }
+        
+        // 保存分析报告
+        function saveAnalysisReport() {
+            if (!window.currentAnalysisContent) return;
+            
+            const title = prompt("请输入报告标题", "数据大屏智能分析报告_" + new Date().toISOString().slice(0,10));
+            if (title) {
+                $.ajax({
+                    url: '/reports/api/save',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        title: title,
+                        content: window.currentAnalysisContent,
+                        report_type: 'dashboard_ai'
+                    }),
+                    success: function(res) {
+                        if (res.success) {
+                            alert('报告保存成功！');
+                            $('#aiSaveBtn').hide();
+                        } else {
+                            alert('保存失败: ' + (res.error || '未知错误'));
+                        }
+                    },
+                    error: function() {
+                        alert('保存请求失败');
+                    }
+                });
+            }
+        }
+        
+        // ========== 打字机效果 ==========
+        function typeWriter($el, text) {
+            $el.html('');
+            let index = 0;
+            const speed = 20;
+            
+            function type() {
+                if (index < text.length) {
+                    $el.append(text.charAt(index));
+                    index++;
+                    setTimeout(type, speed);
+                }
+            }
+            
+            type();
+        }
+    </script>
+</body>
+</html>

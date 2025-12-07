@@ -1,0 +1,577 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* 采集规则库模块样式 */
+  .rules-container {
+    padding: 0;
+  }
+  
+  /* 顶部区域 */
+  .page-banner {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 12px;
+    padding: 25px 30px;
+    margin-bottom: 20px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .page-banner::before {
+    content: '';
+    position: absolute;
+    right: -50px;
+    top: -50px;
+    width: 200px;
+    height: 200px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  
+  .page-banner::after {
+    content: '';
+    position: absolute;
+    right: 80px;
+    bottom: -30px;
+    width: 100px;
+    height: 100px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+  
+  .banner-info h2 {
+    margin: 0 0 8px 0;
+    font-size: 22px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+  
+  .banner-info h2 i {
+    margin-right: 10px;
+    font-size: 26px;
+  }
+  
+  .banner-info p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 14px;
+  }
+  
+  .banner-stats {
+    display: flex;
+    gap: 30px;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .stat-item {
+    text-align: center;
+  }
+  
+  .stat-item .num {
+    font-size: 28px;
+    font-weight: bold;
+  }
+  
+  .stat-item .label {
+    font-size: 13px;
+    opacity: 0.85;
+  }
+
+  /* 主内容区 */
+  .main-panel {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  
+  /* 工具栏 */
+  .toolbar {
+    padding: 20px 25px;
+    background: linear-gradient(to right, #fafbfc, #fff);
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .toolbar-left {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .toolbar .layui-btn {
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+  
+  .toolbar .layui-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .toolbar-right .layui-input {
+    width: 220px;
+    border-radius: 20px;
+    padding-left: 15px;
+  }
+
+  /* 表格区域 */
+  .table-wrapper {
+    padding: 20px 25px;
+  }
+  
+  /* 表格样式 */
+  .layui-table-cell {
+    height: 48px !important;
+    line-height: 48px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 12px;
+  }
+  
+  .layui-table-cell .layui-form-checkbox {
+    top: 0px;
+  }
+  
+  .layui-table th {
+    background: #f8f9fa !important;
+    font-weight: 600;
+  }
+  
+  .layui-table tr:hover {
+    background: #f0fff4 !important;
+  }
+
+  /* 规则卡片样式 (用于XPath显示) */
+  .xpath-tag {
+    display: inline-block;
+    background: #f0f9eb;
+    color: #67c23a;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .domain-tag {
+    display: inline-block;
+    background: #ecf5ff;
+    color: #409eff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  /* 弹窗样式 */
+  .modal-form {
+    padding: 25px;
+  }
+  
+  .form-section {
+    margin-bottom: 20px;
+  }
+  
+  .form-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #11998e;
+    margin-bottom: 15px;
+    padding-left: 10px;
+    border-left: 3px solid #11998e;
+  }
+  
+  .modal-form .layui-form-label {
+    width: 90px;
+  }
+  
+  .modal-form .layui-input-block {
+    margin-left: 120px;
+  }
+  
+  .modal-form .layui-input,
+  .modal-form .layui-textarea {
+    border-radius: 6px;
+  }
+  
+  .modal-form .layui-textarea {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+  }
+  
+  .form-tip {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+  }
+
+  /* 响应式 */
+  @media screen and (max-width: 768px) {
+    .page-banner {
+      flex-direction: column;
+      text-align: center;
+      gap: 20px;
+    }
+    .banner-stats {
+      justify-content: center;
+    }
+    .toolbar {
+      flex-direction: column;
+      gap: 15px;
+    }
+  }
+</style>
+
+<div class="rules-container">
+  
+  <!-- 顶部横幅 -->
+  <div class="page-banner">
+    <div class="banner-info">
+      <h2><i class="layui-icon layui-icon-template"></i> 采集规则库</h2>
+      <p>管理网站采集规则，支持XPath选择器配置</p>
+    </div>
+    <div class="banner-stats">
+      <div class="stat-item">
+        <div class="num" id="stat-total">--</div>
+        <div class="label">规则总数</div>
+      </div>
+      <div class="stat-item">
+        <div class="num" id="stat-active">--</div>
+        <div class="label">已启用</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主面板 -->
+  <div class="main-panel">
+    
+    <!-- 工具栏 -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="layui-btn" id="add-btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+          <i class="layui-icon layui-icon-add-1"></i> 新增规则
+        </button>
+        <button class="layui-btn layui-btn-danger" id="batch-delete">
+          <i class="layui-icon layui-icon-delete"></i> 批量删除
+        </button>
+        <button class="layui-btn layui-btn-primary" id="refresh-btn">
+          <i class="layui-icon layui-icon-refresh-3"></i> 刷新
+        </button>
+      </div>
+      <div class="toolbar-right">
+        <input type="text" id="search-keyword" placeholder="搜索站点名称或域名..." class="layui-input">
+        <button class="layui-btn layui-btn-normal" id="do-search" style="border-radius: 20px;">
+          <i class="layui-icon layui-icon-search"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 表格区域 -->
+    <div class="table-wrapper">
+      <table id="data-table" lay-filter="data-table"></table>
+    </div>
+    
+  </div>
+</div>
+
+<!-- 操作栏模板 -->
+<script type="text/html" id="table-bar">
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="edit">
+    <i class="layui-icon layui-icon-edit"></i> 编辑
+  </a>
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="copy">
+    <i class="layui-icon layui-icon-file"></i> 复制
+  </a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">
+    <i class="layui-icon layui-icon-delete"></i>
+  </a>
+</script>
+
+<!-- 编辑/新增弹窗 -->
+<div id="edit-modal" style="display: none;">
+  <div class="modal-form">
+    <form class="layui-form" lay-filter="edit-form">
+      <input type="hidden" name="id">
+      
+      <!-- 基本信息 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-set"></i> 基本信息
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">站点名称</label>
+          <div class="layui-input-block">
+            <input type="text" name="site_name" required lay-verify="required" placeholder="例如：百度新闻、新华网" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">域名/标识</label>
+          <div class="layui-input-block">
+            <input type="text" name="domain" placeholder="例如：baidu.com、news.cn" autocomplete="off" class="layui-input">
+            <div class="form-tip">用于自动匹配URL，建议填写主域名</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- XPath配置 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-code-circle"></i> XPath 选择器
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">标题XPath</label>
+          <div class="layui-input-block">
+            <input type="text" name="title_xpath" placeholder="例如：//h1/text() 或 //h1[@class='title']" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">内容XPath</label>
+          <div class="layui-input-block">
+            <input type="text" name="content_xpath" placeholder="例如：//div[@class='content'] 或 //article" autocomplete="off" class="layui-input">
+          </div>
+        </div>
+      </div>
+      
+      <!-- 请求头配置 -->
+      <div class="form-section" style="margin-bottom: 0;">
+        <div class="form-section-title">
+          <i class="layui-icon layui-icon-set-fill"></i> 请求头配置
+        </div>
+        <div class="layui-form-item layui-form-text">
+          <label class="layui-form-label">Headers</label>
+          <div class="layui-input-block">
+            <textarea name="headers" placeholder='支持 JSON 格式，如：&#10;{&#10;  "User-Agent": "Mozilla/5.0...",&#10;  "Cookie": "..."&#10;}&#10;&#10;或直接从浏览器复制的请求头文本' class="layui-textarea" rows="8"></textarea>
+          </div>
+        </div>
+      </div>
+      
+      <div class="layui-form-item" style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; text-align: right;">
+        <button class="layui-btn" lay-submit lay-filter="save-edit" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 6px;">
+          <i class="layui-icon layui-icon-ok"></i> 保存规则
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['table', 'form', 'layer'], function(){
+  var table = layui.table;
+  var form = layui.form;
+  var layer = layui.layer;
+  var $ = layui.$;
+
+  // 加载统计
+  function loadStats(){
+    $.get('/rules/api/list?limit=9999', function(res){
+      if(res.code === 0){
+        var total = res.data ? res.data.length : 0;
+        var active = res.data ? res.data.filter(function(r){ return r.is_active !== false; }).length : 0;
+        $('#stat-total').text(total);
+        $('#stat-active').text(active);
+      }
+    });
+  }
+  loadStats();
+
+  // 渲染表格
+  var tableIns = table.render({
+    elem: '#data-table',
+    url: '/rules/api/list',
+    page: true,
+    limit: 15,
+    cols: [[
+      {type: 'checkbox', fixed: 'left'},
+      {field: 'id', title: 'ID', width: 70, sort: true},
+      {field: 'site_name', title: '站点名称', width: 150, templet: function(d){
+        return '<span style="font-weight: 600; color: #333;">' + d.site_name + '</span>';
+      }},
+      {field: 'domain', title: '域名/标识', width: 160, templet: function(d){
+        return d.domain ? '<span class="domain-tag">' + d.domain + '</span>' : '<span style="color:#ccc;">-</span>';
+      }},
+      {field: 'title_xpath', title: '标题XPath', minWidth: 180, templet: function(d){
+        return d.title_xpath ? '<span class="xpath-tag" title="'+d.title_xpath+'">' + d.title_xpath + '</span>' : '-';
+      }},
+      {field: 'content_xpath', title: '内容XPath', minWidth: 180, templet: function(d){
+        return d.content_xpath ? '<span class="xpath-tag" title="'+d.content_xpath+'">' + d.content_xpath + '</span>' : '-';
+      }},
+      {field: 'created_at', title: '创建时间', width: 170, sort: true},
+      {fixed: 'right', title:'操作', toolbar: '#table-bar', width: 180}
+    ]],
+    done: function(){
+      loadStats();
+    }
+  });
+
+  // 搜索
+  $('#do-search').on('click', function(){
+    var keyword = $('#search-keyword').val();
+    tableIns.reload({
+      where: {keyword: keyword},
+      page: {curr: 1}
+    });
+  });
+  
+  $('#search-keyword').on('keyup', function(e){
+    if(e.keyCode === 13) $('#do-search').click();
+  });
+  
+  // 刷新
+  $('#refresh-btn').on('click', function(){
+    tableIns.reload();
+    layer.msg('已刷新', {icon: 1, time: 1000});
+  });
+
+  // 新增按钮
+  $('#add-btn').on('click', function(){
+    form.val('edit-form', {
+      "id": "",
+      "site_name": "",
+      "domain": "",
+      "title_xpath": "",
+      "content_xpath": "",
+      "headers": ""
+    });
+    
+    layer.open({
+      type: 1,
+      title: '<i class="layui-icon layui-icon-add-1" style="color: #11998e;"></i> 新增采集规则',
+      area: ['650px', '620px'],
+      content: $('#edit-modal')
+    });
+  });
+
+  // 批量删除
+  $('#batch-delete').on('click', function(){
+    var checkStatus = table.checkStatus('data-table');
+    var data = checkStatus.data;
+    if(data.length === 0){
+      layer.msg('请选择要删除的数据', {icon: 0});
+      return;
+    }
+    var ids = data.map(function(item){return item.id;});
+    
+    layer.confirm('确认删除选中的 <b style="color:#FF5722;">' + data.length + '</b> 条规则吗？', {icon: 3, title: '删除确认'}, function(index){
+      $.ajax({
+        url: '/rules/api/delete',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: ids}),
+        success: function(res){
+          if(res.code === 0){
+            layer.msg('删除成功', {icon: 1});
+            tableIns.reload();
+          } else {
+            layer.msg('删除失败: ' + res.msg, {icon: 2});
+          }
+        }
+      });
+      layer.close(index);
+    });
+  });
+
+  // 表格行操作
+  table.on('tool(data-table)', function(obj){
+    var data = obj.data;
+    var layEvent = obj.event;
+
+    if(layEvent === 'del'){
+      layer.confirm('确定删除这条规则吗？', {icon: 3, title: '删除确认'}, function(index){
+        $.ajax({
+          url: '/rules/api/delete',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ids: [data.id]}),
+          success: function(res){
+            if(res.code === 0){
+              obj.del();
+              layer.msg('删除成功', {icon: 1});
+            } else {
+              layer.msg('删除失败: ' + res.msg, {icon: 2});
+            }
+          }
+        });
+        layer.close(index);
+      });
+    } else if(layEvent === 'copy'){
+      layer.confirm('确认复制该规则吗？', {icon: 3, title: '复制确认'}, function(index){
+        $.ajax({
+          url: '/rules/api/copy',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({id: data.id}),
+          success: function(res){
+            if(res.code === 0){
+              layer.msg('复制成功', {icon: 1});
+              tableIns.reload();
+            } else {
+              layer.msg('复制失败: ' + res.msg, {icon: 2});
+            }
+          }
+        });
+        layer.close(index);
+      });
+    } else if(layEvent === 'edit'){
+      form.val('edit-form', {
+        "id": data.id,
+        "site_name": data.site_name,
+        "domain": data.domain,
+        "title_xpath": data.title_xpath,
+        "content_xpath": data.content_xpath,
+        "headers": data.headers
+      });
+      
+      layer.open({
+        type: 1,
+        title: '<i class="layui-icon layui-icon-edit" style="color: #11998e;"></i> 编辑采集规则',
+        area: ['650px', '620px'],
+        content: $('#edit-modal')
+      });
+    }
+  });
+
+  // 保存表单
+  form.on('submit(save-edit)', function(data){
+    var field = data.field;
+    var url = field.id ? '/rules/api/update' : '/rules/api/add';
+    
+    $.ajax({
+      url: url,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(field),
+      success: function(res){
+        if(res.code === 0){
+          layer.closeAll('page');
+          layer.msg('保存成功', {icon: 1});
+          tableIns.reload();
+        } else {
+          layer.msg('保存失败: ' + res.msg, {icon: 2});
+        }
+      }
+    });
+    return false;
+  });
+});
+</script>
+{% endblock %}

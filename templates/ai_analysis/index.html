@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Markdown & Highlight Support -->
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/github-dark.min.css') }}">
+<script src="{{ url_for('static', filename='js/highlight.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sql.min.js') }}"></script>
+
+<style>
+    /* Commercial UI Tweaks */
+    .ai-container {
+        height: calc(100vh - 180px);
+        display: flex;
+        flex-direction: column;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    .ai-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        background: #fafafa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .ai-chat-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #f7f7f7;
+        scroll-behavior: smooth;
+    }
+    
+    .ai-input-area {
+        padding: 20px;
+        background: #fff;
+        border-top: 1px solid #eee;
+        position: relative;
+    }
+    
+    /* Chat Bubbles */
+    .chat-message {
+        margin-bottom: 25px;
+        max-width: 85%;
+        clear: both;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .chat-message.user {
+        float: right;
+    }
+    
+    .chat-message.ai {
+        float: left;
+        width: 100%; /* AI message takes full width for tables etc */
+        max-width: 95%;
+    }
+    
+    .message-content {
+        padding: 15px 20px;
+        border-radius: 12px;
+        position: relative;
+        line-height: 1.6;
+        font-size: 15px;
+    }
+    
+    .user .message-content {
+        background: #007bff; /* Commercial Blue */
+        color: #fff;
+        border-bottom-right-radius: 2px;
+        box-shadow: 0 2px 5px rgba(0,123,255,0.2);
+    }
+    
+    .ai .message-content {
+        background: #fff;
+        color: #333;
+        border-bottom-left-radius: 2px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+    }
+    
+    .ai-avatar {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        margin-right: 15px;
+        float: left;
+        box-shadow: 0 2px 5px rgba(118, 75, 162, 0.3);
+    }
+
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+        background: #ddd;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        margin-left: 15px;
+        float: right;
+    }
+    
+    /* Process/Thought Log Styles */
+    .process-log {
+        margin-bottom: 15px;
+        font-size: 13px;
+        border-left: 3px solid #e0e0e0;
+        margin-left: 51px; /* Align with text */
+    }
+    
+    .process-item {
+        padding: 6px 12px;
+        margin-bottom: 4px;
+        background: rgba(245,245,245,0.5);
+        border-radius: 4px;
+        color: #666;
+        display: flex;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    
+    .process-item:hover {
+        background: rgba(240,240,240,0.8);
+    }
+    
+    .process-icon {
+        margin-right: 8px;
+        width: 16px;
+        text-align: center;
+    }
+    
+    /* Markdown Content Styles */
+    .markdown-body {
+        margin-left: 51px; /* Align with avatar */
+        color: #2c3e50;
+    }
+    
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+        margin-top: 15px;
+        margin-bottom: 10px;
+        color: #1a1a1a;
+    }
+    
+    .markdown-body table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        background: #fff;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .markdown-body th, .markdown-body td {
+        padding: 10px 15px;
+        border: 1px solid #eaeaea;
+    }
+    
+    .markdown-body th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #444;
+    }
+    
+    .markdown-body pre {
+        background: #2d2d2d;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 10px 0;
+        overflow-x: auto;
+        color: #f8f8f2;
+    }
+    
+    /* Input Area Styles */
+    .input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        background: #f4f6f8;
+        border-radius: 24px;
+        padding: 10px 20px;
+        border: 1px solid #e1e4e8;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .input-wrapper:focus-within {
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        background: #fff;
+    }
+    
+    #prompt {
+        flex: 1;
+        border: none;
+        background: transparent;
+        resize: none;
+        max-height: 150px;
+        padding: 8px 0;
+        font-size: 15px;
+        outline: none;
+        line-height: 1.5;
+    }
+    
+    #do-analyze {
+        margin-left: 10px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #007bff;
+        border: none;
+        transition: transform 0.1s;
+    }
+    
+    #do-analyze:active {
+        transform: scale(0.95);
+    }
+    
+    #do-analyze i {
+        font-size: 18px;
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes blink {
+        0% { opacity: .2; }
+        20% { opacity: 1; }
+        100% { opacity: .2; }
+    }
+    
+    .typing-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 3px;
+        background: #999;
+        border-radius: 50%;
+        animation: blink 1.4s infinite both;
+    }
+    
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Engine Select Style */
+    .engine-selector {
+        width: 250px;
+    }
+</style>
+
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="ai-container">
+        <!-- Header -->
+        <div class="ai-header">
+            <div style="display: flex; align-items: center;">
+                <i class="layui-icon layui-icon-engine" style="font-size: 20px; color: #007bff; margin-right: 10px;"></i>
+                <span style="font-size: 16px; font-weight: 600; color: #333;">AI 智能数据分析师</span>
+            </div>
+            <div class="engine-selector">
+                <form class="layui-form" action="">
+                    <select name="engine_id" id="engine-select" lay-filter="engine-select">
+                        <option value="">加载引擎中...</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Chat Area -->
+        <div class="ai-chat-area" id="chat-area">
+            <!-- Welcome Message -->
+            <div class="chat-message ai">
+                <div class="ai-avatar">AI</div>
+                <div class="message-content">
+                    <div class="markdown-body">
+                        你好！我是您的智能数据分析助手。我可以帮您：
+                        <ul>
+                            <li>查询数据库中的文章详情</li>
+                            <li>统计采集数据量</li>
+                            <li>清洗异常数据</li>
+                            <li>执行自定义 SQL 分析</li>
+                        </ul>
+                        请在下方输入您的指令。
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="ai-input-area">
+            <div class="input-wrapper">
+                <textarea id="prompt" placeholder="请输入分析指令，例如：'统计今日采集数据' 或 '查询标题为空的文章'..." rows="1"></textarea>
+                <button class="layui-btn layui-btn-normal" id="do-analyze">
+                    <i class="layui-icon layui-icon-release"></i>
+                </button>
+            </div>
+            <div style="font-size: 12px; color: #999; margin-top: 8px; text-align: right;">
+                Enter 发送，Shift + Enter 换行
+            </div>
+        </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['form', 'layer', 'jquery'], function(){
+    var form = layui.form;
+    var layer = layui.layer;
+    var $ = layui.$;
+
+    // Init Highlight.js
+    hljs.highlightAll();
+
+    // Load Engines
+    $.get('/ai_analysis/api/engines', function(res){
+        if(res.code === 0){
+            var html = '<option value="">请选择AI引擎</option>';
+            res.data.forEach(function(item){
+                html += '<option value="'+item.id+'">'+item.name+'</option>';
+            });
+            $('#engine-select').html(html);
+            form.render('select');
+            
+            // Select first if available
+            if(res.data.length > 0){
+                $('#engine-select').val(res.data[0].id);
+                form.render('select');
+            }
+        }
+    });
+
+    // Auto-resize textarea
+    $('#prompt').on('input', function(){
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+        if(this.value === '') this.style.height = 'auto';
+    });
+
+    // Handle Enter key
+    $('#prompt').on('keydown', function(e){
+        if(e.keyCode === 13 && !e.shiftKey){
+            e.preventDefault();
+            $('#do-analyze').click();
+        }
+    });
+
+    // Analyze Action
+    $('#do-analyze').on('click', async function(){
+        var engineId = $('#engine-select').val();
+        var promptText = $('#prompt').val().trim();
+
+        if(!engineId){
+            layer.msg('请先选择AI引擎', {icon: 0, anim: 6});
+            return;
+        }
+        if(!promptText){
+            layer.msg('请输入分析指令', {icon: 0, anim: 6});
+            return;
+        }
+
+        // 1. Add User Message
+        appendUserMessage(promptText);
+        $('#prompt').val('').css('height', 'auto');
+        
+        // 2. Add AI Placeholder
+        var aiMsgId = 'ai-msg-' + Date.now();
+        appendAIMessagePlaceholder(aiMsgId);
+        
+        var $btn = $(this);
+        $btn.addClass('layui-btn-disabled').attr('disabled', true);
+        
+        // 3. Start Streaming
+        try {
+            const response = await fetch('/ai_analysis/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({engine_id: engineId, prompt: promptText})
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            let fullAnswer = '';
+            let buffer = '';
+            
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n\n');
+                
+                // Keep the last chunk in buffer (it might be incomplete)
+                buffer = lines.pop();
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (!dataStr.trim()) continue;
+                        
+                        try {
+                            const data = JSON.parse(dataStr);
+                            handleStreamEvent(aiMsgId, data, function(chunk){
+                                fullAnswer += chunk;
+                            });
+                        } catch (e) {
+                            console.error('Error parsing SSE:', e);
+                        }
+                    }
+                }
+            }
+            
+            // Finalize: Ensure Markdown is rendered if not already
+            // In this implementation, we update markdown incrementally or at end.
+            // We'll rely on handleStreamEvent to update the UI.
+            
+        } catch (err) {
+            updateAIMessageError(aiMsgId, err.message);
+        } finally {
+            $btn.removeClass('layui-btn-disabled').attr('disabled', false);
+            // Remove typing indicator if exists
+            $('#'+aiMsgId).find('.typing-indicator').remove();
+        }
+    });
+    
+    // UI Helpers
+    function appendUserMessage(text) {
+        var html = `
+            <div class="chat-message user">
+                <div class="user-avatar"><i class="layui-icon layui-icon-username"></i></div>
+                <div class="message-content">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
+            </div>
+        `;
+        $('#chat-area').append(html);
+        scrollToBottom();
+    }
+    
+    function appendAIMessagePlaceholder(id) {
+        var html = `
+            <div class="chat-message ai" id="${id}">
+                <div class="ai-avatar">AI</div>
+                <div class="process-log"></div>
+                <div class="message-content">
+                    <div class="markdown-body"></div>
+                    <div class="typing-indicator" style="margin-top: 10px;">
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#chat-area').append(html);
+        scrollToBottom();
+    }
+    
+    function handleStreamEvent(msgId, data, appendAnswerCallback) {
+        var $msg = $('#' + msgId);
+        var $log = $msg.find('.process-log');
+        var $content = $msg.find('.markdown-body');
+        
+        if (data.type === 'step') {
+            $log.append(`<div class="process-item"><div class="process-icon">🔄</div> ${data.content}</div>`);
+        } else if (data.type === 'thought') {
+             // Only show thought if needed, or collapse it. For now, small log.
+             // Truncate long thoughts for log
+             var shortThought = data.content.length > 50 ? data.content.substring(0,50) + '...' : data.content;
+             $log.append(`<div class="process-item" title="${escapeHtml(data.content)}"><div class="process-icon">💭</div> 思考: ${shortThought}</div>`);
+        } else if (data.type === 'tool_call') {
+            $log.append(`<div class="process-item"><div class="process-icon">🛠️</div> 调用工具: ${data.content}</div>`);
+        } else if (data.type === 'tool_result') {
+            $log.append(`<div class="process-item"><div class="process-icon">📋</div> 工具返回结果</div>`);
+        } else if (data.type === 'answer') {
+            // Streaming answer content
+            // Note: Since 'answer' event comes as full content chunks usually, or streaming chunks?
+            // The backend 'agent.run' yields 'message.get("content")'. 
+            // If it's non-streaming API from OpenAI, it returns full text at once.
+            // If it returns full text, we just replace.
+            // If we want "typing effect", we can just set it since it comes in one big chunk at the end usually in this agent implementation.
+            
+            // Current core.py implementation yields the FULL content at the end of the loop.
+            // So we can just render it.
+            
+            var rawMarkdown = data.content || '';
+            // Use marked to render
+            $content.html(marked.parse(rawMarkdown));
+            
+            // Highlight code blocks
+            $content.find('pre code').each(function(i, block) {
+                hljs.highlightElement(block);
+            });
+            
+            // Remove typing indicator as we have answer
+            $msg.find('.typing-indicator').remove();
+        } else if (data.type === 'error') {
+            $content.append(`<div style="color: red; margin-top: 10px;">❌ ${data.content}</div>`);
+            $msg.find('.typing-indicator').remove();
+        } else if (data.type === 'saved') {
+            $log.append(`<div class="process-item" style="background-color: #e6ffed; color: #28a745;">
+                <div class="process-icon">✅</div> 
+                报告已自动保存: ${data.title}
+                <a href="/reports/" target="_blank" style="margin-left: 10px; color: #007bff; text-decoration: underline;">查看</a>
+            </div>`);
+            layer.msg('分析报告已自动保存', {icon: 1});
+        }
+        
+        scrollToBottom();
+    }
+    
+    function updateAIMessageError(id, errorMsg) {
+        $('#' + id).find('.markdown-body').append(`<div style="color: red;">Network Error: ${errorMsg}</div>`);
+        $('#' + id).find('.typing-indicator').remove();
+    }
+    
+    function scrollToBottom() {
+        var chatArea = document.getElementById('chat-area');
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return text;
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+});
+</script>
+{% endblock %}
